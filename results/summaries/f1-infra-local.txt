@@ -1,0 +1,5 @@
+dlq_url = "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/poc-asr1-ingest-dlq"
+function_name = "poc-asr1-reconciler"
+queue_name = "poc-asr1-ingest"
+queue_url = "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/poc-asr1-ingest"
+table_name = "poc-asr1-idempotency"

@@ -1,0 +1,3 @@
+enviados: 60 mensajes (50 únicos, 10 duplicados)
+COMPLETADO=50 EN_PROCESO=0 filas=50 DLQ=0 (esperado: COMPLETADO=50, EN_PROCESO=0, DLQ=0)
+RESULTADO: OK

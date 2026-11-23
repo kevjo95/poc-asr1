@@ -21,3 +21,9 @@ results/raw/
 node_modules/
 .DS_Store
 .githooks/blocklist.txt
+__pycache__/
+*.pyc
+.pytest_cache/
+node_modules/
+target/
+.DS_Store
