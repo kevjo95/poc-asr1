@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: ingest-ms
+  threads:
+    virtual:
+      enabled: true          # regla 5: virtual threads
+server:
+  shutdown: graceful
+  tomcat:
+    max-http-response-header-size: 16KB
+
+ingest:
+  queue-url: ${INGEST_QUEUE_URL:}
+  hmac-secret: ${INGEST_HMAC_SECRET:}        # regla 8: solo por variable de entorno
+  sqs:
+    region: ${AWS_REGION:us-east-1}
+    endpoint: ${INGEST_SQS_ENDPOINT:}        # vacío en AWS; http://localstack:4566 en local
+    timeout-ms: ${INGEST_SQS_TIMEOUT_MS:2000} # regla 6: timeout explícito hacia SQS
+    max-concurrency: ${INGEST_SQS_MAX_CONCURRENCY:200}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        ingest.sqs.send.latency: true
+
+logging:
+  structured:
+    format:
+      console: ecs               # regla 7: logs JSON

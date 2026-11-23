@@ -1,0 +1,10 @@
+OK    202 firma y cuerpo válidos -> 202
+OK    202 fuente central-payments -> 202
+OK    401 firma inválida -> 401
+OK    401 sin firma -> 401
+OK    400 JSON inválido -> 400
+OK    400 campo obligatorio ausente -> 400
+OK    400 X-Event-Id distinto del cuerpo -> 400
+OK    404 fuente desconocida -> 404
+OK    503 SQS no confirma -> 503
+RESULTADO: OK

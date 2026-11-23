@@ -25,3 +25,15 @@ send_event() { # $1 eventId  $2 source
     --message-body "{\"eventId\":\"$1\",\"type\":\"deposit.settled\"}" \
     --message-attributes "{\"eventId\":{\"DataType\":\"String\",\"StringValue\":\"$1\"},\"source\":{\"DataType\":\"String\",\"StringValue\":\"${2:-argyle}\"}}" >/dev/null
 }
+
+# --- helpers para hablar con el MS de ingesta ---
+HMAC_SECRET="${INGEST_HMAC_SECRET:-poc-local-secret}"
+sign_body() { printf '%s' "$1" | openssl dgst -sha256 -hmac "$HMAC_SECRET" -hex | awk '{print $NF}'; }
+mk_body() { # $1 eventId
+  printf '{"eventId":"%s","type":"deposit.settled","occurredAt":"2026-12-01T13:00:00Z","accountId":"acc_1","amount":{"value":1250.75,"currency":"USD"}}' "$1"; }
+post_webhook() { # $1 base  $2 source  $3 eventId-header  $4 body  $5 signature(header value, vacío = sin header)
+  local args=(-s -o /dev/null -w '%{http_code}' -X POST "$1/webhooks/$2" -H 'Content-Type: application/json' --data-binary "$4")
+  [ -n "$3" ] && args+=(-H "X-Event-Id: $3")
+  [ -n "$5" ] && args+=(-H "X-Signature: $5")
+  curl "${args[@]}"
+}
