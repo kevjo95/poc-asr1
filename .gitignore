@@ -1,0 +1,23 @@
+CLAUDE.local.md
+.claude/settings.local.json
+.claude/worktrees/
+docs/plans/HANDOFF.md
+
+# Secrets / credentials / kube access
+.env
+.env.*
+*.pem
+*.key
+kubeconfig*
+.kube/
+.aws/
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+
+# Test output (may contain raw payloads)
+results/raw/
+node_modules/
+.DS_Store
+.githooks/blocklist.txt

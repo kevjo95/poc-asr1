@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Blocks commits that contain employer/company data or credentials (public academic repo).
+# Patterns live in .githooks/blocklist.txt (kept local, ignored by git).
+set -u
+BL="$(git rev-parse --show-toplevel)/.githooks/blocklist.txt"
+STAGED=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$STAGED" ] && exit 0
+fail=0
+# Generic secret patterns
+if git diff --cached -U0 -- . ':(exclude).githooks/pre-commit' | grep -E '^\+' | grep -qE 'AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|aws_secret_access_key|BEGIN [A-Z ]*PRIVATE KEY|arn:aws:[a-z0-9-]+:[a-z0-9-]*:[0-9]{12}:|\b[0-9]{12}\b.*amazonaws'; then
+  echo "BLOCKED: possible AWS credential, ARN or account id in staged changes."; fail=1
+fi
+# Local blocklist (company names, account ids, service names)
+if [ -f "$BL" ]; then
+  if git diff --cached -U0 -- . ':(exclude).githooks/pre-commit' | grep -E '^\+' | grep -qiEf "$BL"; then
+    echo "BLOCKED: staged changes match .githooks/blocklist.txt (company data)."; fail=1
+  fi
+fi
+exit $fail
