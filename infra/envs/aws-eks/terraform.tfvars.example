@@ -1,5 +1,5 @@
 # Copia a terraform.tfvars (ignorado por Git). Elige UN preset y no subas valores reales al repositorio.
-aws_profile     = "poc-asr1"
+aws_profile     = "poc-asr1-tf"   # perfil puente (credential_process) sobre `aws login`
 cluster_version = "1.36"
 
 # --- Preset cuota-5 (cuota actual de 5 vCPU: 2 nodos de 2 vCPU = 4). k6 corre en los nodos del MS; no se puede medir nodo nuevo.
