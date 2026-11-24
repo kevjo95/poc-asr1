@@ -20,5 +20,26 @@ Por eso la curva no es monótona y el "capacidad ≈ 350/s" que calculó el aná
 
 **Correcciones aplicadas.** Memoria 1 GiB (heap 512 MiB) y `timeoutSeconds: 3` en las sondas (ADR 0006, enmienda).
 
-## Intento 2
-Pendiente de ejecutar con el perfil corregido.
+## Intento 2 (`p0-20261123-195103`) · VÁLIDO
+Perfil corregido (1 GiB, sondas con timeout 3 s). 1 réplica fija, escalones de 50/s cada 60 s. Evidencia: `results/summaries/p0-20261123-195103-informe.md`.
+
+| Escalón | p99 | Errores |
+|---|---|---|
+| 50/s | 29 ms | 0 % |
+| 100/s | 135 ms | 0 % |
+| 150/s | 152 ms | 0 % |
+| 200/s | 81 ms | 0 % |
+| 250/s | 5000 ms (timeouts) | 9,4 % |
+| 300/s | 5002 ms | 88 % → k6 aborta la prueba (regla de seguridad) |
+
+**Resultado: capacidad de una réplica local ≈ 200 req/s** con p99 < 300 ms y 0 % de errores. Con 4 réplicas mínimas serían ≈ 800/s teóricos,
+por encima de los 500/s del ASR1 (la P2 lo confirma o refuta con el HPA real).
+
+**Cómo falla (hallazgo).** No degrada de forma gradual sino en cliff: sin OOM esta vez, pero el pod se **reinició por *liveness*** (código 143) al saturarse
+(CPU medio 287m con límite 500m: el *throttling* de CPU frena el hilo que atiende las sondas). El reinicio deja al MS sin servicio unos
+segundos y agrava la caída. En producción esto sugiere que la *liveness* no debe depender de la carga (mayor `failureThreshold`/`timeoutSeconds`),
+y que conviene escalar antes de saturar (el HPA al 80 % del request dispara mucho antes del cliff).
+
+**Conciliación.** Ver el informe. Hay más mensajes en SQS que `202` cuando el cliente expira antes de recibir la respuesta; la idempotencia absorbe los reintentos.
+
+**Límites de la medición.** k6, el clúster y LocalStack comparten el mismo equipo: el p99 en 100–150/s (≈135–150 ms) es ruido de CPU compartida, no del MS.

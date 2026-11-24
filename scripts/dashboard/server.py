@@ -89,6 +89,35 @@ def add(msg, level="info"):
 PREV_POD, PREV_T, LAST = {}, None, {"desired": None, "ready": None, "dlq": 0, "lambda": None, "pods": set()}
 
 
+SCEN = {
+    "p0-calibracion": ("P0 · Calibración", "1 réplica fija, HPA apagado. Sube +50 req/s cada 60 s hasta que el p99 supere 300 ms: mide la capacidad de un pod."),
+    "p1-base": ("P1 · Carga base", "125 req/s constantes con HPA activo (4–8). Debe cumplir p99 < 300 ms y errores < 0,1 % sin escalar."),
+    "p2-rafaga": ("P2 · Ráfaga de nómina (ASR1)", "125 → 500 req/s en 1 min, sostenido 5 min, con HPA activo. Mide p99, errores y tiempo de escalado."),
+    "p3-estres": ("P3 · Estrés", "Desde 500 req/s, +100 cada 2 min hasta el punto de quiebre del sistema con HPA activo."),
+}
+
+
+def scenario():
+    """Detecta el escenario en curso por el proceso de k6 (el dashboard no depende de run-scenario.sh)."""
+    try:
+        out = subprocess.run(["ps", "-axo", "etime=,command="], capture_output=True, text=True, timeout=3).stdout
+    except Exception:
+        return None
+    for ln in out.splitlines():
+        if "k6" in ln and " run " in ln:
+            for key, (title, desc) in SCEN.items():
+                if f"load/{key}.js" in ln:
+                    et = ln.split()[0]; parts = [int(x) for x in re.split(r"[-:]", et)]
+                    secs = 0
+                    for x in parts: secs = secs * 60 + x if len(parts) <= 3 else secs
+                    if len(parts) == 4: secs = ((parts[0] * 24 + parts[1]) * 60 + parts[2]) * 60 + parts[3]
+                    extra = None
+                    if key == "p0-calibracion":
+                        extra = f"escalón actual ≈ {50 + 50 * min(11, secs // 60)} req/s"
+                    return {"title": title, "desc": desc, "elapsed": secs, "extra": extra}
+    return None
+
+
 def collect():
     global PREV_POD, PREV_T
     now = time.time()
@@ -166,7 +195,7 @@ def collect():
     snap = {"t": int(now), "rps": rps, "p99": None if p99 is None else round(p99, 1), "sqs_p99": None if sq99 is None else round(sq99, 1),
             "err": round(err * 100, 3), "ready": ready_n, "hpa": hpa, "queue": qv + qf, "queue_visible": qv, "queue_inflight": qf,
             "dlq": dv + df, "items": items, "lambda": lstate, "pods": pods,
-            "limits": {"p99_ms": P99_LIMIT_MS, "err_pct": ERR_LIMIT * 100, "hpa_target": HPA_TARGET}}
+            "scenario": scenario(), "limits": {"p99_ms": P99_LIMIT_MS, "err_pct": ERR_LIMIT * 100, "hpa_target": HPA_TARGET}}
     with LOCK:
         STATE.update(snap); STATE["loaded"] = True
         HIST.append({k: snap[k] for k in ("t", "rps", "p99", "sqs_p99", "err", "ready", "queue", "dlq")} | {"desired": hpa["desired"], "cpu_pct": hpa["cpu_pct"]})

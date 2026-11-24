@@ -84,6 +84,15 @@
 </header>
 
 <main>
+  <section class="card" id="scen" style="border-left:6px solid var(--blue)">
+    <div style="display:flex;gap:18px;align-items:baseline;flex-wrap:wrap">
+      <div style="font-size:22px;font-weight:700" id="sc-t">Sin prueba en curso</div>
+      <div class="sub" id="sc-x"></div><div class="grow"></div>
+      <div style="font-size:22px;font-weight:700;font-variant-numeric:tabular-nums" id="sc-e"></div>
+    </div>
+    <div class="sub" style="font-size:14px;margin-top:2px" id="sc-d">Lanza un escenario con ./scripts/run-scenario.sh p0|p1|p2|p3</div>
+  </section>
+
   <section class="card">
     <h2>Flujo de extremo a extremo</h2>
     <div class="flow">
@@ -186,6 +195,13 @@ function draw() {
   $('status').className = 'pill ' + worst;
   $('status').textContent = worst === 'ok' ? '● Dentro de los criterios del ASR1' : worst === 'warn' ? (scaling ? '● Escalando…' : '● Atención') : '● Fuera de criterio';
   $('clock').textContent = new Date().toLocaleTimeString('es');
+
+  // escenario en curso
+  const sc = s.scenario, mm = (n) => String(Math.floor(n / 60)).padStart(2, '0') + ':' + String(n % 60).padStart(2, '0');
+  $('sc-t').textContent = sc ? sc.title : 'Sin prueba en curso';
+  $('sc-d').textContent = sc ? sc.desc : 'Lanza un escenario con ./scripts/run-scenario.sh p0|p1|p2|p3';
+  $('sc-x').textContent = sc && sc.extra ? sc.extra : '';
+  $('sc-e').textContent = sc ? '⏱ ' + mm(sc.elapsed) : '';
 
   // flujo
   $('f-rps').textContent = fmt(s.rps, 0);
