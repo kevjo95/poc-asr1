@@ -1,0 +1,10 @@
+=== nodeport (http://localhost:8080) · 150 req/s · 60 s
+peticiones=9000  202=9000  no-202=0
+dropped_iterations=0  (debe ser 0: si no, el generador es el cuello de botella)
+fase steady     p95=5.5ms  p99=59.6ms  errores=0.000%  n=9000
+=== directo (http://localhost:18081) · 150 req/s · 60 s
+peticiones=8908  202=8799  no-202=109
+dropped_iterations=92  (debe ser 0: si no, el generador es el cuello de botella)
+fase steady     p95=6.1ms  p99=2038.2ms  errores=1.224%  n=8908
+time="2026-11-23T20:24:40-05:00" level=error msg="thresholds on metrics 'dropped_iterations, fail_phase{phase:steady}, lat_phase{phase:steady}' have been crossed"
+(compara errores y p99 de k6 en ambos caminos; si solo el NodePort falla, el cuello está en el entorno y no en el MS)

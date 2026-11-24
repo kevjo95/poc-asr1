@@ -22,3 +22,12 @@ reducido distorsionaba la dinámica que se quería validar.
 **Consecuencia:** la capacidad por réplica de P0 medida con 500m de límite deja de valer y se repite. Además cada corrida añade un **pre-calentamiento**
 (40 req/s, 90 s) y espera que el HPA se estabilice en 4 réplicas con CPU < 60 % antes de medir, porque el arranque en frío de la JVM (CPU > 150 %)
 dispara el escalado.
+
+## Enmienda 3 · corrección de la enmienda 2 (tras el intento 2 de P2)
+La enmienda 2 se apoyó en "~3,6m de CPU por req/s", cifra tomada con la **JVM en frío**. Ya pre-calentada, el MS gasta ~**1m por req/s**
+(a 125 req/s por pod: ~43 % de 300m ≈ 130m). Consecuencias medidas en P2 intento 2 (request 300m): con 4 réplicas el CPU nunca pasó de 43 %,
+el HPA no escaló y la ráfaga a 500/s se absorbió sin añadir pods; por tanto no se pudo medir el tiempo de escalado.
+Con el servicio ya caliente, **request 100m** deja el umbral del HPA (80m) en ~80 req/s por pod: el tráfico base (31 req/s por pod con 4 réplicas)
+queda en ~31 % y los 125 req/s por pod de la ráfaga en ~125 %, de modo que el HPA sí reacciona a la ráfaga y no a la base.
+**Decisión:** request **100m**, límite **1000m** (relación 1:10 como en producción, 200m/2000m); memoria 1 GiB. El intento 1 de P2 escaló
+por el arranque en frío, no por la carga base; el pre-calentamiento (enmienda 2) ya lo corrige y se mantiene.

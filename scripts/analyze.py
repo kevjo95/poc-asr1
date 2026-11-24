@@ -115,7 +115,12 @@ elif sc == "p2":
 cpu = list(csv.DictReader(open(f"{run_dir}/cpu.csv")))
 if cpu:
     mx = max(int(r["cpu_millicores_max"]) for r in cpu)
-    w(f"\n- CPU máxima observada en un pod: **{mx}m** (request 100m, límite 500m).")
+    try:
+        _r = json.load(open(f"{run_dir}/pods.json"))["items"][0]["spec"]["containers"][0]["resources"]
+        _rl = f"request {_r['requests']['cpu']}, límite {_r['limits']['cpu']}"
+    except Exception:
+        _rl = "request/límite no disponibles"
+    w(f"\n- CPU máxima observada en un pod: **{mx}m** ({_rl}).")
 
 w("\n## Conciliación de pérdidas\n")
 w("```\n" + open(f"{run_dir}/reconcile.txt").read().strip() + "\n```")

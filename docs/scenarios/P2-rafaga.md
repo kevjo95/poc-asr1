@@ -27,3 +27,22 @@ Evidencia: `results/summaries/p2-20261123-200050-informe.md`, capturas en `docs/
 - Recalibrar request/límite de CPU para que el HPA no actúe en la carga base (ver ADR 0006, enmienda).
 - Pre-calentar la JVM y esperar a que el HPA se estabilice en 4 réplicas antes de medir el escalado.
 - Medir el camino cliente→pod (generador y NodePort) para separar el ruido del entorno del comportamiento del MS.
+
+## Intento 2 (`p2-20261123-202502`) · NO CONCLUYENTE (escalado) · evidencia: `docs/scenarios/evidence/p2-intento2/`
+Con pre-calentamiento y espera de estabilidad (HPA en 4 réplicas, CPU < 60 %) y request de CPU 300m.
+
+| Fase | Vista de k6 | Vista del MS (dashboard) |
+|---|---|---|
+| Calentamiento 125/s | p99 8 ms · 0 % | p99 3–8 ms · 0 % |
+| Ráfaga 125→500/s | p99 512 ms · 0 % | p99 3–62 ms |
+| Sostenido 500/s | p95 130 ms · **p99 1273 ms** · errores 0,098 % | p99 3–150 ms · 0 % · CPU 29–43 % |
+| Retorno | p99 1971 ms · 0,76 % | p99 3–51 ms |
+
+- **0 mensajes perdidos:** 242.639 `202` frente a 243.069 mensajes en SQS (+430 por reintentos tras timeout del cliente), DLQ 0, `EN_PROCESO` 0.
+- **Errores incluida la ráfaga: 0,071 %** (cumple < 0,1 %), pero con margen mínimo y concentrados en el retorno.
+- **No hubo escalado:** 4 réplicas absorbieron 500/s con CPU ≤ 43 % del request de 300m. El tiempo de escalado **no se midió** (ver ADR 0006, enmienda 3: con la JVM caliente el costo es ~1m por req/s y 300m era demasiado alto).
+- **p99 de k6 vs MS:** por segunda vez k6 mide 1,3–2 s de p99 mientras el MS responde en decenas de ms, con 4 y con 8 réplicas, y con 680 iteraciones descartadas. La latencia está en el camino cliente→pod (k6 y Docker Desktop comparten el equipo con el clúster), no en el servicio.
+
+## Intento 3 (por ejecutar)
+- Request **100m** / límite 1000m (ADR 0006, enmienda 3) para que el HPA reaccione a la ráfaga.
+- Generador de carga **dentro del clúster** (k6 como Job que ataca el Service) para eliminar Docker Desktop y la competencia por CPU con el equipo.

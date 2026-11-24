@@ -34,8 +34,23 @@ sleep 20   # que el arranque de la JVM deje de consumir CPU antes de medir
 # 2) Aislar el MS: pausar el consumo de la Lambda durante la carga (se reanuda al final)
 MAP=$("${AWS[@]}" lambda list-event-source-mappings --function-name "$PREFIX-reconciler" --query 'EventSourceMappings[0].UUID' --output text)
 "${AWS[@]}" lambda update-event-source-mapping --uuid "$MAP" --no-enabled >/dev/null
-log "Consumo de la Lambda en pausa; purgando cola y tabla"
 QURL=$(queue_url "$QUEUE_NAME"); DLQURL=$(queue_url "$DLQ_NAME")
+# Pre-calentamiento (JIT, pools de conexión) y espera de estabilidad: sin esto el arranque en frío de la JVM (CPU > 150 %)
+# dispara el HPA antes de la prueba y el tiempo de escalado medido no tiene sentido (hallazgo del intento 1 de P2).
+log "Pre-calentamiento: ${PREWARM_RATE:-40} req/s durante ${PREWARM_S:-90} s"
+k6 run --quiet -e RUN_ID="prewarm-$RUN_ID" load/prewarm.js >/dev/null 2>&1 || true
+rm -f "results/summaries/prewarm-$RUN_ID.json"
+if [ "$SC" != "p0" ]; then
+  log "Esperando que el HPA se estabilice en $WANT réplicas con CPU < 60 % (máx ${STABLE_WAIT_S:-900} s)"
+  ok=0; DL=$(( $(date +%s) + ${STABLE_WAIT_S:-900} ))
+  while [ "$(date +%s)" -lt "$DL" ]; do
+    h=$(kubectl get hpa ingest-ms -o jsonpath='{.status.currentReplicas},{.status.desiredReplicas},{.status.currentMetrics[0].resource.current.averageUtilization}' 2>/dev/null || echo ",,")
+    cur=${h%%,*}; rest=${h#*,}; des=${rest%%,*}; cpu=${rest#*,}
+    if [ "$cur" = "$WANT" ] && [ "$des" = "$WANT" ] && [ "${cpu:-100}" -lt 60 ]; then ok=$((ok+1)); else ok=0; fi
+    [ "$ok" -ge 6 ] && break; sleep 5; done
+  [ "$ok" -ge 6 ] && log "HPA estable en $WANT réplicas" || log "AVISO: el HPA no se estabilizó en $WANT; el escalado de la prueba puede no ser representativo"
+fi
+log "Consumo de la Lambda en pausa; purgando cola y tabla"
 for q in "$QURL" "$DLQURL"; do "${AWS[@]}" sqs purge-queue --queue-url "$q" >/dev/null 2>&1 || true; done
 $PY scripts/purge_table.py "$TABLE_NAME"; sleep 3
 

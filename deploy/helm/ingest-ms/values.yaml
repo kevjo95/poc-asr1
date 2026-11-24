@@ -6,7 +6,7 @@ image:
 # Perfil reducido en proporción (ADR 0006). En AWS/producción usar 200m / 2000m y 3096Mi.
 resources:
   requests: { cpu: 100m, memory: 1Gi }
-  limits:   { cpu: 500m, memory: 1Gi }
+  limits:   { cpu: 1000m, memory: 1Gi }
 javaOpts: "-Xss256k -Xmx512m -Xms512m -XX:+UseG1GC"
 
 # HPA idéntico al observado en producción (ADR 0004).

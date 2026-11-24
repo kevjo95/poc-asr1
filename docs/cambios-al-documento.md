@@ -18,10 +18,10 @@ Estado: **Confirmado** (hay evidencia ejecutada) · **Propuesto** (decisión de 
 |---|---|---|---|
 | B1 | "125/s **sostenidos**" → "125/s **en promedio**" (900.000 webhooks en 2 h; la base de 1 M usuarios, independiente de los usuarios activos) | ADR 0005 | Propuesto |
 | B2 | HPA: **mín 4 / máx 8, CPU 80 % del request**, ventana de subida 0 s y de bajada 300 s (no "2–10" ni `ALBRequestCountPerTarget`). §9: ejemplo "de 2 a 8 réplicas" → "de 4 a N" | HPA observado en producción (spike-01 §2.3) | Confirmado |
-| B3 | El **request de CPU** condiciona cuándo escala el HPA: a 100m el HPA reaccionaba al tráfico base. Documentar el request/límite usado y justificarlo | P2 intento 1; ADR 0006 enmienda 2 | Confirmado |
+| B3 | El **request de CPU** fija el umbral del HPA (80 % del request) y debe justificarse. Medido con la JVM caliente: ~1m de CPU por req/s por pod; con request 100m el HPA reacciona a la ráfaga (~125 %) y no a la base (~31 %); con 300m no escaló en absoluto. Documentar request/límite usados y esta relación | P2 intentos 1 y 2; ADR 0006 enmiendas 2–3 | Confirmado |
 | B4 | Capacidad por réplica (req/s con p99 < 300 ms): ~200/s con CPU 100m/500m en local. Repetir con el perfil 300m/1000m y citar el valor en §7.2 para justificar "4 réplicas cubren 500/s" | P0 intento 2 | Pendiente (repetir P0) |
 | B5 | "Tiempo de escalado ≤ 3 min" debe medirse desde el inicio de la ráfaga hasta que la última réplica nueva está *Ready* y **separar tramos** (decisión del HPA, arranque del pod, nodo nuevo). Local: pods *Ready* en 9–11 s; el nodo nuevo no aplica en kind | P2 intento 1 y 2 | Parcial |
-| B6 | Reconocer que el arranque en frío de la JVM (CPU > 150 %) puede disparar el HPA; la prueba exige **pre-calentamiento** y estabilidad previa | P2 intento 1 | Confirmado |
+| B6 | Reconocer que el arranque en frío de la JVM (CPU > 150 %, ~3,6m por req/s frente a ~1m en caliente) puede disparar el HPA; la prueba exige **pre-calentamiento** y estabilidad previa. Esto también aplica a producción: un pod nuevo consume CPU extra al arrancar | P2 intentos 1 y 2 | Confirmado |
 
 ## C. Criterios y medición de "0 perdidos"
 | # | Qué cambiar | Por qué / evidencia | Estado |
@@ -29,6 +29,7 @@ Estado: **Confirmado** (hay evidencia ejecutada) · **Propuesto** (decisión de 
 | C1 | Definir "0 perdidos" en **dos niveles**: (1) todo `202` está en SQS (`202` de k6 = mensajes enviados) y (2) lo procesado por la Lambda queda `COMPLETADO` sin DLQ ni `EN_PROCESO` atascados | P0/P2: sin pérdidas de lo confirmado | Confirmado |
 | C2 | Aclarar que SQS puede contener **más** mensajes que `202` (el cliente expira antes de recibir la respuesta pero el MS ya persistió): el diseño necesita la idempotencia por `eventId` | P0: +4.151; P2-1: +791 | Confirmado |
 | C3 | "Errores < 0,1 %" debe medirse **en el cliente** (k6) y no solo en el MS: el MS no ve los fallos de conexión previos a la aplicación | P2 intento 1: k6 0,89 % vs MS 0 % | Confirmado |
+| C4 | La latencia que mide el generador de carga no es la del servicio: en dos corridas k6 midió p99 de 1,3–1,6 s mientras el MS registraba decenas de ms (4 y 8 réplicas). Medir el generador **dentro del clúster** o reportar ambas vistas | P2 intentos 1 y 2 | Confirmado; causa por aislar |
 
 ## D. Hallazgos de operación que enriquecen el documento (riesgos y recomendaciones)
 | # | Hallazgo | Evidencia | Estado |
