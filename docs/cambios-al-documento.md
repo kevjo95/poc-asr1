@@ -60,5 +60,5 @@ Estado: **Confirmado** (hay evidencia ejecutada) · **Propuesto** (decisión de 
 | G9 | Un **arranque en frío** directo a 500 req/s colapsa; con 20 s de calentamiento a 100 req/s no. Mantener el pre-calentamiento como parte del protocolo de prueba | Diagnóstico a 500/s con y sin calentamiento | Parcial |
 
 ## E. Pendiente de decidir con el grupo
-- Mantener el documento 100 % local o dejar abierta una corrida en AWS (el repo ya tiene el Terraform del destino AWS, solo validado).
+- Mantener el documento 100 % local o incluir la corrida en AWS: **plan 0002 redactado** (`docs/plans/0002-validacion-en-aws.md`), pendiente de aprobación y de que exista la cuenta. Es la única forma de medir el nodo nuevo dentro de los 3 min y la Lambda con carga.
 - Si el "tiempo de escalado" local debe presentarse como cumplimiento o solo como evidencia de la dinámica (la medición completa exige un nodo nuevo, que kind no tiene).
