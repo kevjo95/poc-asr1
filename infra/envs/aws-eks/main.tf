@@ -69,6 +69,19 @@ module "eks" {
   enable_cluster_creator_admin_permissions = true
   enable_irsa                              = true
 
+  # El dashboard lee /actuator/prometheus de cada pod por el proxy del API server; el plano de control solo llega a los
+  # nodos por los puertos permitidos, y 8080 (el MS) no estaba. Solo desde el grupo de seguridad del clúster.
+  node_security_group_additional_rules = {
+    ingress_cluster_ms_8080 = {
+      description                   = "Cluster API to node 8080/tcp (proxy de metricas del MS)"
+      protocol                      = "tcp"
+      from_port                     = 8080
+      to_port                       = 8080
+      type                          = "ingress"
+      source_cluster_security_group = true
+    }
+  }
+
   cluster_addons = {
     coredns    = { most_recent = true }
     kube-proxy = { most_recent = true }
