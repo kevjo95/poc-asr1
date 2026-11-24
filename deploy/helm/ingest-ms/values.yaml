@@ -5,7 +5,7 @@ image:
 
 # Perfil reducido en proporción (ADR 0006). Límite 2000m como producción (la JVM ve 2 CPUs); request 100m, ver ADR 0006 enmiendas 3-4. En AWS: 200m / 2000m y 3096Mi.
 resources:
-  requests: { cpu: 100m, memory: 1Gi }
+  requests: { cpu: 200m, memory: 1Gi }
   limits:   { cpu: 2000m, memory: 1Gi }
 javaOpts: "-Xss256k -Xmx512m -Xms512m -XX:+UseG1GC"
 

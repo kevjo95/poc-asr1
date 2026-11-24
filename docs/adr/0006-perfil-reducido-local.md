@@ -35,3 +35,8 @@ por el arranque en frío, no por la carga base; el pre-calentamiento (enmienda 2
 ## Enmienda 4 · límite de CPU 2000m
 La JVM ve tantos CPUs como el límite del contenedor: con ≤ 1000m ve 1 y la réplica aguanta ~200-300 req/s; con 2000m ve 2 y aguanta ~400 (experimento E0-E3).
 Producción usa 2000m. **Decisión final del perfil local:** request 100m / **límite 2000m** / memoria 1 GiB (heap 512 MiB).
+
+## Enmienda 5 · request de CPU 200m
+La estimación «~1m de CPU por req/s» (enmienda 3) subestimó la base: con 125 req/s sobre 4 pods (31 req/s por pod) el HPA midió 44–64 % de un request de 100m, con picos sobre 80 %
+que subieron las réplicas a 6 durante el calentamiento. El costo no es lineal: hay un consumo fijo de la JVM más ~1–2m por req/s.
+**Decisión:** request **200m** y límite 2000m, igual que producción. Con 200m el umbral del HPA (160m) deja la base en ~30 % y la ráfaga (~125 req/s por pod con 4 réplicas) por encima.

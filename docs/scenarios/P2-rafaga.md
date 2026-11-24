@@ -43,6 +43,28 @@ Con pre-calentamiento y espera de estabilidad (HPA en 4 réplicas, CPU < 60 %) y
 - **No hubo escalado:** 4 réplicas absorbieron 500/s con CPU ≤ 43 % del request de 300m. El tiempo de escalado **no se midió** (ver ADR 0006, enmienda 3: con la JVM caliente el costo es ~1m por req/s y 300m era demasiado alto).
 - **p99 de k6 vs MS:** por segunda vez k6 mide 1,3–2 s de p99 mientras el MS responde en decenas de ms, con 4 y con 8 réplicas, y con 680 iteraciones descartadas. La latencia está en el camino cliente→pod (k6 y Docker Desktop comparten el equipo con el clúster), no en el servicio.
 
-## Intento 3 (por ejecutar)
+## Intento 3 previsto
 - Request **100m** / límite 1000m (ADR 0006, enmienda 3) para que el HPA reaccione a la ráfaga.
 - Generador de carga **dentro del clúster** (k6 como Job que ataca el Service) para eliminar Docker Desktop y la competencia por CPU con el equipo.
+
+## Intento 3 (`p2-20261123-221301`) · el escalado se mide; latencia y errores los condiciona el emulador de SQS
+Perfil final: Java 25, hilos de plataforma, request 100m / límite 2000m, generador **dentro del clúster**, pre-calentamiento y espera de estabilidad. Evidencia: `docs/scenarios/evidence/p2-intento3/`.
+
+| Fase | Vista de k6 | Vista del MS (dashboard) |
+|---|---|---|
+| Calentamiento 125/s | p99 22 ms · 0 % | p99 3–9 ms · 0 % |
+| Ráfaga | p99 1089 ms · 0 % | p99 4–11 ms |
+| Sostenido 500/s | p95 903 ms · p99 1830 ms · 0,64 % | p99 4–11 ms · 0 % salvo **dos picos** (1409 ms y 2101 ms) |
+| Retorno | p99 1896 ms · 0,79 % | p99 3–14 ms salvo el pico final (7,8 % de errores) |
+
+- **Escalado:** el HPA reaccionó a la ráfaga: 6 → 7 → 8 réplicas, la última *Ready* a **86 s** del inicio de la ráfaga (criterio ≤ 3 min). Los pods nuevos tardaron **5 s** en estar *Ready*.
+  Salvedad: ya había 6 réplicas al empezar la ráfaga porque con request de 100m el tráfico base (125/s, ~62 % del request) cruzó el 80 % con ruido durante el calentamiento. En kind no existe el tramo de nodo nuevo.
+- **0 perdidos:** 241.732 `202` frente a 242.877 mensajes en SQS (+1.145 por reintentos tras timeout del cliente), DLQ 0, `EN_PROCESO` 0.
+- **De dónde sale la latencia de k6.** Salvo los picos, el MS responde en ~5 ms. En los dos picos el p99 del MS es **idéntico** al p99 de su propio `SendMessage` a SQS
+  (1409,2 = 1409,2 ms; 2101,4 = 2101,4 ms): el tiempo se pierde dentro de la llamada a SQS, no en el MS. Con la cola creciendo a ~243.000 mensajes, el emulador (LocalStack) sufre
+  paradas de segundos; el MS responde con `503`/espera y k6 las ve como cola de peticiones y timeouts.
+- **Veredicto local:** el escalado del HPA cumple y el MS no es el cuello de botella; el p99 y los errores del ASR1 **no se pueden concluir** en local porque el sustituto de SQS no sostiene 500 mensajes por segundo de forma estable.
+
+## Siguiente paso
+Repetir P2 sustituyendo el SQS de LocalStack por un servidor compatible más rápido (ElasticMQ) solo para la ruta de ingesta, y, en paralelo, la corrida en AWS (plan 0002), donde SQS real
+no tiene este límite. Subir el request de CPU a 200m (como producción) para que el tráfico base no cruce el umbral del HPA.
