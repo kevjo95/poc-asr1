@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PoC ASR1 · Monitor</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#121b2e; --panel2:#17233a; --line:#26344f; --text:#e6edf7; --muted:#8fa3c2;
+    --ok:#2ecc71; --warn:#f5b041; --bad:#ff5c5c; --blue:#4da3ff; --violet:#a78bfa; --teal:#2dd4bf;
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#f1f5fb; --panel:#ffffff; --panel2:#eef3fb; --line:#d5deec; --text:#14213a; --muted:#5b6d8c; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  header{display:flex;align-items:center;gap:16px;padding:14px 22px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  h1{font-size:18px;margin:0;font-weight:650}
+  .sub{color:var(--muted);font-size:12px}
+  .grow{flex:1}
+  .pill{padding:6px 14px;border-radius:999px;font-weight:650;font-size:13px;border:1px solid var(--line)}
+  .pill.ok{background:rgba(46,204,113,.15);color:var(--ok);border-color:var(--ok)}
+  .pill.warn{background:rgba(245,176,65,.15);color:var(--warn);border-color:var(--warn)}
+  .pill.bad{background:rgba(255,92,92,.15);color:var(--bad);border-color:var(--bad)}
+  .seg button{background:var(--panel);color:var(--muted);border:1px solid var(--line);padding:5px 10px;cursor:pointer;font-size:12px}
+  .seg button:first-child{border-radius:8px 0 0 8px}.seg button:last-child{border-radius:0 8px 8px 0}
+  .seg button.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+  main{padding:18px 22px;display:grid;gap:16px;max-width:1500px;margin:0 auto}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+  .card h2{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 8px;font-weight:600}
+
+  /* flujo */
+  .flow{display:flex;align-items:stretch;gap:0;overflow-x:auto}
+  .node{flex:1;min-width:170px;background:var(--panel2);border:2px solid var(--line);border-radius:14px;padding:12px 14px;position:relative}
+  .node .t{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  .node .big{font-size:26px;font-weight:700;margin:2px 0}
+  .node .s{font-size:12px;color:var(--muted)}
+  .node.ok{border-color:var(--ok)} .node.warn{border-color:var(--warn)} .node.bad{border-color:var(--bad)}
+  .arrow{display:flex;align-items:center;justify-content:center;width:44px;color:var(--muted);font-size:22px;flex:none}
+  .arrow.live{color:var(--blue);animation:pulse 1s infinite}
+  @keyframes pulse{50%{opacity:.3}}
+
+  /* kpis */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--line);border-radius:12px;padding:10px 14px}
+  .kpi .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  .kpi .v{font-size:30px;font-weight:700;line-height:1.15}
+  .kpi .n{font-size:11px;color:var(--muted)}
+  .kpi.ok{border-left-color:var(--ok)}.kpi.warn{border-left-color:var(--warn)}.kpi.bad{border-left-color:var(--bad)}
+  .kpi.ok .v{color:var(--ok)}.kpi.warn .v{color:var(--warn)}.kpi.bad .v{color:var(--bad)}
+
+  .charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:16px}
+  canvas{width:100%;height:170px;display:block}
+  .legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:4px;flex-wrap:wrap}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px}
+
+  .bottom{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+  @media(max-width:1000px){.bottom{grid-template-columns:1fr}}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{color:var(--muted);font-weight:600;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding:4px 6px}
+  td{padding:6px;border-top:1px solid var(--line)}
+  .bar{height:10px;background:var(--panel2);border-radius:6px;position:relative;min-width:120px;overflow:hidden}
+  .bar>b{position:absolute;left:0;top:0;bottom:0;border-radius:6px;background:var(--blue)}
+  .bar>u{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--warn)}
+  .tag{padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;background:var(--panel2)}
+  .tag.Ready{color:var(--ok)}.tag.Terminating{color:var(--bad)}.tag.Pending,.tag.Running{color:var(--warn)}
+  #events{max-height:260px;overflow:auto;font-size:13px}
+  #events div{padding:5px 0;border-top:1px solid var(--line);display:flex;gap:10px}
+  #events time{color:var(--muted);font-variant-numeric:tabular-nums}
+  #events .scale{color:var(--blue)}#events .bad{color:var(--bad)}
+  footer{color:var(--muted);font-size:11px;text-align:center;padding:6px 0 20px}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>PoC ASR1 · Escalabilidad de la ingesta de webhooks</h1>
+    <div class="sub">kind + LocalStack · datos sintéticos · criterios: p99 &lt; 300 ms · errores &lt; 0,1 % · 0 perdidos</div>
+  </div>
+  <div class="grow"></div>
+  <div class="seg" id="win"><button data-w="60">2 min</button><button data-w="150" class="on">5 min</button><button data-w="450">15 min</button></div>
+  <div class="pill ok" id="status">Conectando…</div>
+  <div class="sub" id="clock"></div>
+</header>
+
+<main>
+  <section class="card">
+    <h2>Flujo de extremo a extremo</h2>
+    <div class="flow">
+      <div class="node" id="n-load"><div class="t">Proveedores · k6</div><div class="big" id="f-rps">–</div><div class="s">peticiones por segundo</div></div>
+      <div class="arrow" id="a1">➜</div>
+      <div class="node" id="n-ms"><div class="t">MS de ingesta</div><div class="big" id="f-pods">–</div><div class="s" id="f-ms-s">réplicas listas · p99 –</div></div>
+      <div class="arrow" id="a2">➜</div>
+      <div class="node" id="n-sqs"><div class="t">Cola SQS</div><div class="big" id="f-q">–</div><div class="s" id="f-q-s">mensajes persistidos · DLQ –</div></div>
+      <div class="arrow" id="a3">➜</div>
+      <div class="node" id="n-lam"><div class="t">Lambda conciliación</div><div class="big" id="f-lam">–</div><div class="s">consumo de la cola</div></div>
+      <div class="arrow">➜</div>
+      <div class="node" id="n-ddb"><div class="t">DynamoDB · idempotencia</div><div class="big" id="f-items">–</div><div class="s">eventos registrados</div></div>
+    </div>
+  </section>
+
+  <section class="kpis" id="kpis"></section>
+
+  <section class="charts">
+    <div class="card"><h2>Tráfico recibido (req/s)</h2><canvas id="c1"></canvas>
+      <div class="legend"><span><i style="background:var(--blue)"></i>peticiones por segundo (suma de réplicas)</span></div></div>
+    <div class="card"><h2>Latencia p99 del MS (ms)</h2><canvas id="c2"></canvas>
+      <div class="legend"><span><i style="background:var(--teal)"></i>p99 del MS</span><span><i style="background:var(--bad)"></i>límite 300 ms</span></div></div>
+    <div class="card"><h2>Réplicas</h2><canvas id="c3"></canvas>
+      <div class="legend"><span><i style="background:var(--violet)"></i>listas</span><span><i style="background:var(--warn)"></i>deseadas por el HPA</span></div></div>
+    <div class="card"><h2>CPU promedio del HPA (% del request)</h2><canvas id="c4"></canvas>
+      <div class="legend"><span><i style="background:var(--teal)"></i>CPU %</span><span><i style="background:var(--warn)"></i>objetivo 80 % (dispara el escalado)</span></div></div>
+    <div class="card"><h2>Cola de ingesta y DLQ</h2><canvas id="c5"></canvas>
+      <div class="legend"><span><i style="background:var(--blue)"></i>mensajes persistidos</span><span><i style="background:var(--bad)"></i>DLQ</span></div></div>
+    <div class="card"><h2>Errores (%)</h2><canvas id="c6"></canvas>
+      <div class="legend"><span><i style="background:var(--bad)"></i>no-202 sobre el total</span><span><i style="background:var(--warn)"></i>límite 0,1 %</span></div></div>
+  </section>
+
+  <section class="bottom">
+    <div class="card"><h2>Detalle por réplica</h2>
+      <table><thead><tr><th>Pod</th><th>Nodo</th><th>Estado</th><th>CPU (request 100m · límite 500m)</th><th>req/s</th><th>p99</th><th>Edad</th></tr></thead><tbody id="pods"></tbody></table></div>
+    <div class="card"><h2>Eventos</h2><div id="events"></div></div>
+  </section>
+</main>
+<footer>Solo lectura · actualiza cada 2 s · uso académico</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let WINDOW = 150, DATA = null;
+
+document.querySelectorAll('#win button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#win button').forEach(x => x.classList.remove('on')); b.classList.add('on'); WINDOW = +b.dataset.w; draw();
+});
+
+const fmt = (v, d = 0) => (v === null || v === undefined || isNaN(v)) ? '–' : Number(v).toLocaleString('es', {maximumFractionDigits: d, minimumFractionDigits: d});
+const lvl = (bad, warn) => bad ? 'bad' : warn ? 'warn' : 'ok';
+
+function chart(canvas, series, opt = {}) {
+  const dpr = window.devicePixelRatio || 1, W = canvas.clientWidth, H = canvas.clientHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  const g = canvas.getContext('2d'); g.scale(dpr, dpr); g.clearRect(0, 0, W, H);
+  const L = 42, R = 10, T = 8, B = 18, w = W - L - R, h = H - T - B;
+  const n = Math.max(...series.map(s => s.data.length), 2);
+  let max = opt.max ?? Math.max(1, ...series.flatMap(s => s.data.filter(v => v != null)), ...(opt.lines || []).map(l => l.v));
+  max = opt.max ?? max * 1.15;
+  g.strokeStyle = css('--line'); g.fillStyle = css('--muted'); g.font = '11px sans-serif'; g.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = T + h - (h * i / 4);
+    g.beginPath(); g.moveTo(L, y); g.lineTo(W - R, y); g.stroke();
+    g.fillText(fmt(max * i / 4, max < 10 ? 1 : 0), 4, y + 4);
+  }
+  (opt.lines || []).forEach(l => {
+    const y = T + h - h * l.v / max; g.strokeStyle = css(l.c); g.setLineDash([6, 4]); g.beginPath(); g.moveTo(L, y); g.lineTo(W - R, y); g.stroke(); g.setLineDash([]);
+  });
+  series.forEach(s => {
+    g.strokeStyle = css(s.c); g.lineWidth = 2; g.beginPath(); let open = false;
+    s.data.forEach((v, i) => {
+      if (v == null) { open = false; return; }
+      const x = L + w * (i / (n - 1)), y = T + h - h * Math.min(v, max) / max;
+      if (!open) { g.moveTo(x, y); open = true; } else g.lineTo(x, y);
+    });
+    g.stroke();
+  });
+  g.fillStyle = css('--muted'); g.fillText(`hace ${Math.round(n * 2 / 60 * 10) / 10} min`, L, H - 3); g.fillText('ahora', W - R - 30, H - 3);
+}
+
+function kpi(id, label, value, note, level) {
+  let e = $('k-' + id);
+  if (!e) { e = document.createElement('div'); e.id = 'k-' + id; $('kpis').appendChild(e); }
+  e.className = 'kpi ' + level;
+  e.innerHTML = `<div class="l">${label}</div><div class="v">${value}</div><div class="n">${note}</div>`;
+}
+
+function draw() {
+  if (!DATA) return;
+  const s = DATA.state, hist = DATA.history.slice(-WINDOW), lim = s.limits || {};
+  if (!s.loaded) { $('status').textContent = s.error || 'Esperando datos…'; $('status').className = 'pill warn'; return; }
+  const hpa = s.hpa || {};
+  const p99Lvl = s.p99 == null ? 'ok' : s.p99 > lim.p99_ms ? 'bad' : s.p99 > lim.p99_ms * .67 ? 'warn' : 'ok';
+  const errLvl = s.err > lim.err_pct ? 'bad' : s.err > 0 ? 'warn' : 'ok';
+  const dlqLvl = s.dlq > 0 ? 'bad' : 'ok';
+  const cpuLvl = hpa.cpu_pct == null ? 'ok' : hpa.cpu_pct > lim.hpa_target ? 'warn' : 'ok';
+  const scaling = hpa.desired != null && hpa.desired !== s.ready;
+  const worst = [p99Lvl, errLvl, dlqLvl].includes('bad') ? 'bad' : [p99Lvl, errLvl, cpuLvl].includes('warn') || scaling ? 'warn' : 'ok';
+  $('status').className = 'pill ' + worst;
+  $('status').textContent = worst === 'ok' ? '● Dentro de los criterios del ASR1' : worst === 'warn' ? (scaling ? '● Escalando…' : '● Atención') : '● Fuera de criterio';
+  $('clock').textContent = new Date().toLocaleTimeString('es');
+
+  // flujo
+  $('f-rps').textContent = fmt(s.rps, 0);
+  $('n-load').className = 'node ' + (s.rps > 0 ? 'ok' : '');
+  ['a1', 'a2', 'a3'].forEach(a => $(a).className = 'arrow' + (s.rps > 0 ? ' live' : ''));
+  $('f-pods').textContent = `${s.ready}${hpa.desired != null ? ' / ' + hpa.desired : ''}`;
+  $('f-ms-s').textContent = `réplicas listas${hpa.enabled ? ' / deseadas' : ' (HPA apagado)'} · p99 ${fmt(s.p99, 0)} ms`;
+  $('n-ms').className = 'node ' + lvl(p99Lvl === 'bad' || errLvl === 'bad', p99Lvl === 'warn' || scaling);
+  $('f-q').textContent = fmt(s.queue);
+  $('f-q-s').textContent = `persistidos (${fmt(s.queue_inflight)} en vuelo) · DLQ ${fmt(s.dlq)}`;
+  $('n-sqs').className = 'node ' + lvl(s.dlq > 0, false);
+  $('f-lam').textContent = s.lambda === 'Enabled' ? 'Activa' : s.lambda === 'Disabled' ? 'En pausa' : s.lambda;
+  $('n-lam').className = 'node ' + (s.lambda === 'Enabled' ? 'ok' : 'warn');
+  $('f-items').textContent = fmt(s.items);
+  $('n-ddb').className = 'node ok';
+
+  // KPIs
+  kpi('rps', 'Tráfico', fmt(s.rps, 0) + ' <span style="font-size:14px">req/s</span>', 'objetivo del ASR1: 125 → 500', 'ok');
+  kpi('p99', 'Latencia p99 (MS)', s.p99 == null ? '–' : fmt(s.p99, 0) + ' <span style="font-size:14px">ms</span>', 'criterio: < 300 ms', p99Lvl);
+  kpi('sqs', 'SendMessage a SQS p99', s.sqs_p99 == null ? '–' : fmt(s.sqs_p99, 0) + ' <span style="font-size:14px">ms</span>', 'timeout explícito: 2 s', s.sqs_p99 > 1000 ? 'bad' : 'ok');
+  kpi('err', 'Errores', fmt(s.err, 3) + ' %', 'criterio: < 0,1 %', errLvl);
+  kpi('rep', 'Réplicas listas', `${s.ready}${hpa.desired != null ? ' / ' + hpa.desired : ''}`, hpa.enabled ? `HPA mín ${hpa.min} · máx ${hpa.max}` : 'HPA apagado (réplica fija)', scaling ? 'warn' : 'ok');
+  kpi('cpu', 'CPU promedio (HPA)', hpa.cpu_pct == null ? '–' : hpa.cpu_pct + ' %', `escala al superar ${lim.hpa_target} % del request`, cpuLvl);
+  kpi('queue', 'Cola de ingesta', fmt(s.queue), 'mensajes persistidos', 'ok');
+  kpi('dlq', 'DLQ', fmt(s.dlq), 'debe permanecer en 0', dlqLvl);
+
+  // gráficas
+  const col = (k) => hist.map(h => h[k]);
+  chart($('c1'), [{data: col('rps'), c: '--blue'}]);
+  chart($('c2'), [{data: col('p99'), c: '--teal'}], {lines: [{v: 300, c: '--bad'}]});
+  chart($('c3'), [{data: col('ready'), c: '--violet'}, {data: col('desired'), c: '--warn'}], {max: (hpa.max || 8) + 1});
+  chart($('c4'), [{data: col('cpu_pct'), c: '--teal'}], {lines: [{v: 80, c: '--warn'}]});
+  chart($('c5'), [{data: col('queue'), c: '--blue'}, {data: col('dlq'), c: '--bad'}]);
+  chart($('c6'), [{data: col('err'), c: '--bad'}], {lines: [{v: 0.1, c: '--warn'}], max: Math.max(0.5, ...col('err').filter(v => v != null))});
+
+  // pods
+  $('pods').innerHTML = (s.pods || []).map(p => {
+    const pct = Math.min(100, p.cpu / 500 * 100);
+    return `<tr><td><b>${p.name}</b></td><td>${p.node}</td><td><span class="tag ${p.state}">${p.state}</span></td>
+      <td><div class="bar"><b style="width:${pct}%;background:${p.cpu > 400 ? 'var(--bad)' : p.cpu > 80 ? 'var(--warn)' : 'var(--blue)'}"></b><u style="left:20%"></u></div><small>${fmt(p.cpu, 0)}m</small></td>
+      <td>${fmt(p.rps, 0)}</td><td>${p.p99 == null ? '–' : fmt(p.p99, 0) + ' ms'}</td><td>${p.age < 120 ? p.age + ' s' : Math.round(p.age / 60) + ' min'}</td></tr>`;
+  }).join('');
+  $('events').innerHTML = (DATA.events || []).map(e => `<div><time>${e.t}</time><span class="${e.level}">${e.msg}</span></div>`).join('');
+}
+
+async function tick() {
+  try { DATA = await (await fetch('/api/state', {cache: 'no-store'})).json(); draw(); }
+  catch (e) { $('status').textContent = 'Sin conexión con el servidor'; $('status').className = 'pill bad'; }
+}
+tick(); setInterval(tick, 2000); window.addEventListener('resize', draw);
+</script>
+</body>
+</html>
