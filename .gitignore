@@ -28,3 +28,6 @@ node_modules/
 target/
 .DS_Store
 .venv/
+.idea/
+*.iml
+results/evidence/
