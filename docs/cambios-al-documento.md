@@ -69,5 +69,8 @@ Estado: **Confirmado** (hay evidencia ejecutada) · **Propuesto** (decisión de 
 | G18 | La carga de P3 supera la velocidad de drenaje de la Lambda de conciliación (~200–300 msg/s frente a 1 200 req/s de ingreso): el backlog tarda decenas de minutos en vaciarse tras la prueba. Para producción, evaluar la concurrencia de la Lambda y el tamaño de lote del *event source mapping* si el pico debe drenarse rápido | P3 en AWS (393 000 mensajes pendientes tras 10 min de carga) | Observado; no es un criterio de ASR1 |
 
 ## E. Pendiente de decidir con el grupo
-- Mantener el documento 100 % local o incluir la corrida en AWS: **plan 0002 redactado** (`docs/plans/0002-validacion-en-aws.md`), pendiente de aprobación y de que exista la cuenta. Es la única forma de medir el nodo nuevo dentro de los 3 min y la Lambda con carga.
+- ~~Mantener el documento 100 % local o incluir AWS~~: **la corrida en AWS se hizo** (plan 0002, 24-nov) y es la medición válida de ASR1: ver `docs/scenarios/P2-aws.md` y `P3-aws.md`. Decidir cómo presentar las pruebas locales (indicativas) frente a las de AWS (comparables con producción, salvo el tamaño de la cuenta).
 - Si el "tiempo de escalado" local debe presentarse como cumplimiento o solo como evidencia de la dinámica (la medición completa exige un nodo nuevo, que kind no tiene).
+
+- Nivel 2 de conciliación de P3 sin cerrar al 100 % (el entorno se destruyó con backlog en la cola): decidir si se repite una corrida corta o se documenta como límite.
+- Costo real de la sesión en AWS: pendiente de leer en Cost Explorer (estimado 1–1,5 USD).

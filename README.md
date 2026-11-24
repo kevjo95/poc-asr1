@@ -189,8 +189,17 @@ Mientras corre un escenario, en otra terminal: `./scripts/capture-evidence.sh p2
 
 ## 7. Ejecución en una cuenta AWS propia (opcional)
 
-El Terraform de `infra/envs/aws` está validado pero **no se ha aplicado**. Antes de usarlo: define un presupuesto y una alarma de costos en tu cuenta, usa un perfil propio
-(`AWS_PROFILE`) y revisa `terraform plan` completo. No se versionan credenciales ni identificadores de cuenta.
+La PoC se ejecutó también en AWS (EKS + SQS + Lambda + DynamoDB reales): resultados en `docs/scenarios/P2-aws.md` y `docs/scenarios/P3-aws.md`, plan en `docs/plans/0002-validacion-en-aws.md`.
+Cuesta dinero (unos 0,3–0,5 USD por hora con todo encendido) y **se debe destruir al terminar**.
+
+1. Prepara la cuenta y el perfil de CLI: `docs/aws-cuenta-personal.md`. Define un presupuesto antes de crear nada y usa siempre un perfil propio (`AWS_PROFILE`). Nunca un perfil de trabajo.
+2. `cp infra/envs/aws-eks/terraform.tfvars.example infra/envs/aws-eks/terraform.tfvars`, elige un preset (cuota de 5 vCPU o completo) y revisa `terraform plan`.
+3. `terraform -chdir=infra/envs/aws-eks apply` (pide confirmación). Crea red, EKS, ECR, cola, DLQ, tabla, Lambda, roles y un panel de CloudWatch.
+4. `INGEST_HMAC_SECRET=$(openssl rand -hex 16)` y `./scripts/aws-up.sh` (sube la imagen y despliega el MS). Guarda ese secreto solo en tu consola.
+5. En otra terminal: `TARGET=aws ./scripts/dashboard.sh`. Luego `TARGET=aws ./scripts/run-scenario.sh p2` o `p3` (ver el guion en `docs/guion-video-aws.md`).
+6. **Al terminar:** `./scripts/aws-down.sh` y comprueba que no queden recursos. Revisa Cost Explorer al día siguiente.
+
+No se versionan credenciales, secretos ni identificadores de cuenta.
 
 ## 8. Controles de seguridad del repositorio
 

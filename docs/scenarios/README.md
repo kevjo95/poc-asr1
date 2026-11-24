@@ -12,8 +12,9 @@ Los **F** son funcionales (contrato, idempotencia, conciliación). Los **P** son
 | F5 | Despliegue en kind con HPA de producción | hecho (local) | `results/summaries/f4-cero-perdidos-kind.txt` |
 | P0 | Calibración con 1 réplica fija | pendiente | — |
 | P1 | Base 125/s, 30 min | pendiente | — |
-| P2 | Ráfaga 125 → 500/s | pendiente | — |
-| P3 | Estrés hasta el punto de quiebre | pendiente | — |
+| P2 | Ráfaga 125 → 500/s | local: inconclusivo (LocalStack) · **AWS: hecho** | `P2-rafaga.md`, `P2-aws.md` |
+| P3 | Estrés con autoescalado (800 → 1 200/s) | **AWS: hecho** | `P3-aws.md` |
 
-> Entorno: kind + LocalStack con recursos reducidos en proporción (ADR 0006). Las medidas absolutas
+> Las filas «local» usan kind + LocalStack; las de AWS, EKS con servicios reales (plan 0002).
+> Entorno local: kind + LocalStack con recursos reducidos en proporción (ADR 0006). Las medidas absolutas
 > de p99 y tiempo de escalado son indicativas; ver limitaciones del documento de la PoC.
