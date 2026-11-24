@@ -1,0 +1,42 @@
+# Informe P0 · p0-20261123-210608
+
+- Peticiones: **33831** · `202`: **26523** · no-202: 7307
+- Iteraciones descartadas por k6 (`dropped_iterations`): **2957** ⚠️ el generador (o el MS) no sostuvo la tasa pedida
+- Código de salida de k6: 99 (99 = algún umbral no se cumplió)
+
+## Latencia y errores por fase
+
+| Fase | Tasa lograda | p95 (ms) | p99 (ms) | Errores | ¿Cumple p99<300 y err<0,1 %? |
+|---|---|---|---|---|---|
+| s0100 | 100/s (objetivo 100/s) | 3.2 | 4.6 | 0.000 % | sí |
+| s0200 | 198/s (objetivo 200/s) | 2.3 | 4.0 | 0.000 % | sí |
+| s0300 | 298/s (objetivo 300/s) | 2.1 | 1050.8 | 0.000 % | NO |
+| s0400 | 359/s (objetivo 400/s) | 5000.7 | 5001.0 | 19.993 % | NO |
+| s0500 | 172/s (objetivo 500/s) | 5000.9 | 5001.1 | 100.000 % | NO |
+| s0600 | 0/s (objetivo 600/s) | 0.0 | 0.0 | 0.000 % | sí |
+| s0700 | 0/s (objetivo 700/s) | 0.0 | 0.0 | 0.000 % | sí |
+
+**Capacidad por réplica (1 réplica fija, HPA apagado): ≈ 200 req/s** (último escalón con p99 < 300 ms y errores < 0,1 %).
+Valor objetivo de referencia con el margen del documento (×0,6): ≈ 120 req/s por réplica.
+Réplicas para 500/s con esa capacidad: 2.5; con margen del 40 %: 4.2.
+Primer escalón fuera de criterio: **s0300** (p99 1051 ms, errores 0.00 %).
+
+## Réplicas y CPU
+
+- Réplicas *ready*: inicio **1** → máximo **1** → final 1
+
+Línea de tiempo (cada ~30 s): `t(s) ready/desired cpu%`
+
+`0s:1/-/-%  31s:1/-/-%  61s:1/-/-%  92s:1/-/-%  122s:1/-/-%`
+
+- CPU máxima observada en un pod: **298m** (request 100m, límite 1).
+
+## Conciliación de pérdidas
+
+```
+Nivel 1 · 202 contados por k6 = 26523 · mensajes persistidos en SQS = 29862 · diferencia = -3339
+Nivel 2 · muestra procesada por la Lambda en 5 s: COMPLETADO=50, EN_PROCESO=0, DLQ=0, pendientes en cola=29802
+         (backlog parcial: LocalStack procesa ~9 msg/s; se espera EN_PROCESO=0 y DLQ=0)
+```
+
+> Entorno local con recursos reducidos en proporción (ADR 0006): p99 y tiempo de escalado son indicativos, no comparables con producción.

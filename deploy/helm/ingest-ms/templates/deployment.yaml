@@ -30,6 +30,10 @@ spec:
             - { name: http, containerPort: 8080 }
           env:
             - { name: JAVA_OPTS, value: {{ .Values.javaOpts | quote }} }
+            - { name: LOGGING_LEVEL_EDU_POC_ASR1_INGEST_SQSEVENTPUBLISHER, value: {{ .Values.config.sendLogLevel | quote }} }
+{{- range $k, $v := .Values.extraEnv }}
+            - { name: {{ $k }}, value: {{ $v | quote }} }
+{{- end }}
             - { name: AWS_REGION, value: {{ .Values.config.region | quote }} }
             - { name: INGEST_QUEUE_URL, value: {{ .Values.config.queueUrl | quote }} }
             - { name: INGEST_SQS_ENDPOINT, value: {{ .Values.config.sqsEndpoint | quote }} }

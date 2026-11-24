@@ -1,0 +1,3 @@
+Nivel 1 · 202 contados por k6 = 32065 · mensajes persistidos en SQS = 34479 · diferencia = -2414
+Nivel 2 · muestra procesada por la Lambda en 5 s: COMPLETADO=60, EN_PROCESO=0, DLQ=0, pendientes en cola=34409
+         (backlog parcial: LocalStack procesa ~9 msg/s; se espera EN_PROCESO=0 y DLQ=0)

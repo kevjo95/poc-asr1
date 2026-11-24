@@ -71,7 +71,7 @@ nodos ni la capacidad libre de los nodos.
 | 7 | Firma del webhook | HMAC `X-Signature` | HTTP Basic | Sí (la PoC es más estricta) | Mantener HMAC; documentar que producción usa Basic |
 | 8 | Alcance de la cola | Solo `SendMessage` | MS → SQS → Lambda → idempotencia | **Amplía el alcance** | Incluir Lambda + tabla de idempotencia en la PoC; el documento debe reflejarlo |
 | 9 | Medida "0 perdidos" | `202` k6 vs `NumberOfMessagesSent` | Igual, más "procesados por la Lambda" | Sí | Agregar conciliación en dos niveles (enviados y procesados) |
-| 10 | Runtime | Java 21 | Java 25 en el SR | Sí | Mantener Java 21 (LTS) en la PoC |
+| 10 | Runtime | Java 21 | Java 25 en el SR | Sí | ~~Mantener Java 21~~ **Corregido tras medir:** usar Java 25 como el SR (ver ADR 0008) |
 | 11 | Generador de carga | EC2 con k6 | — | Sí | Local: k6 en el equipo, acotado por recursos |
 
 ## 4. Entorno local y límites

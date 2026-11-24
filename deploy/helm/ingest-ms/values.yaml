@@ -30,9 +30,13 @@ config:
   sqsEndpoint: ""          # vacío en AWS
   sqsTimeoutMs: "2000"
   sqsMaxConcurrency: "200"
+  sendLogLevel: INFO       # nivel del log por petición del publicador (experimento de rendimiento: WARN)
   region: us-east-1
   # Solo para LocalStack. En AWS se usa el rol del pod (IRSA) y esto queda vacío.
   localAwsCredentials: false
 
 # Secreto HMAC: se pasa con --set hmacSecret=... (nunca se versiona).
 hmacSecret: ""
+
+# Variables de entorno extra (experimentos de rendimiento), p. ej. SPRING_THREADS_VIRTUAL_ENABLED: "false"
+extraEnv: {}

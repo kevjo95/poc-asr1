@@ -8,9 +8,11 @@ Estado: **Medido** (evidencia ejecutada) · **Hipótesis** (por probar) · **Dec
 
 | Parámetro | AS-IS observado | TO-BE propuesto | Evidencia / por qué | Estado |
 |---|---|---|---|---|
-| CPU request / límite | 200m / 2000m | 100m / **por definir (≥ 2000m)** | La JVM ve 1 CPU con límite ≤ 1000m (`system_cpu_count=1`); con 2000m ve 2 | Hipótesis (E3, E4) |
-| Hilos de la aplicación | Valores por defecto de Spring (Tomcat 200, sin virtual threads) | Por decidir: virtual threads o por defecto | A 500 req/s la concurrencia ≈ 3 (ley de Little), no limita; lo limita el CPU | Hipótesis (E4, E5) |
-| Log por petición | No medido | Nivel WARN en la ruta caliente (INFO produce ~1 línea JSON por petición) | 76.904 eventos INFO en un pod | Hipótesis (E1, E2) |
+| CPU request / límite | 200m / 2000m | request 100m / **límite 2000m** | Con límite ≤ 1000m la JVM ve 1 CPU y la réplica aguanta ~200–300 req/s; con 2000m ve 2 CPUs y aguanta ~400 | Medido (E0–E3) |
+| Runtime | Java 25 | **Java 25** (la PoC usó 21 al inicio) | Java 21 fija los virtual threads en el cliente HTTP de Apache y el pod deja de responder sondas (ADR 0008) | Medido; mejora con 25 pendiente |
+| Hilos de la aplicación | Valores por defecto de Spring (Tomcat 200, sin virtual threads) | Por decidir: virtual threads o por defecto (comparación en curso) | A 500 req/s la concurrencia ≈ 3 (ley de Little); no limita el número de hilos | Hipótesis |
+| Log por petición | No medido | Sin cambio: no afecta la capacidad (INFO ≈ WARN) | E0 vs E1 y E3 vs E2 | Medido |
+| Puerto de sondas | No medido | Puerto de administración separado del de tráfico | El pod no atendió *liveness* durante el colapso | Hipótesis |
 | Memoria | 3096 MiB (heap 2 GiB) | 1 GiB (heap 512 MiB) en local; en AWS, proporcional al heap | 768 MiB → `OOMKilled` | Medido (P0-1) |
 | *Liveness* | No medido | `timeoutSeconds: 3`, `failureThreshold: 6` | Un pod saturado se reiniciaba y empeoraba la caída | Medido (P0-2) |
 | HPA réplicas | 4 – 8 | 4 – 8 (a validar si 8 alcanza) | Pendiente de P2 con el perfil final | Hipótesis |

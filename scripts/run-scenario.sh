@@ -14,16 +14,17 @@ RUN_ID="$SC-$(date +%Y%m%d-%H%M%S)"; OUT="results/raw/$RUN_ID"; mkdir -p "$OUT" 
 HELM_COMMON=(--set hmacSecret="${INGEST_HMAC_SECRET:-poc-local-secret}"
   --set config.queueUrl=http://poc-asr1-localstack:4566/000000000000/poc-asr1-ingest
   --set config.sqsEndpoint=http://poc-asr1-localstack:4566 --set config.localAwsCredentials=true)
+read -r -a HELM_EXTRA_ARR <<< "${HELM_EXTRA:-}"
 log() { echo "[$(date +%H:%M:%S)] $*"; }
 
 # 1) Estado del MS según el escenario
 if [ "$SC" = "p0" ]; then
   log "P0: HPA apagado y 1 réplica fija"
-  helm upgrade ingest-ms deploy/helm/ingest-ms "${HELM_COMMON[@]}" --set autoscaling.enabled=false --set replicaCount=1 >/dev/null
+  helm upgrade ingest-ms deploy/helm/ingest-ms "${HELM_COMMON[@]}" --set autoscaling.enabled=false --set replicaCount=1 "${HELM_EXTRA_ARR[@]}" >/dev/null
   WANT=1
 else
   log "$SC: HPA activo; esperando el mínimo de 4 réplicas (la bajada del HPA puede tardar ~5 min)"
-  helm upgrade ingest-ms deploy/helm/ingest-ms "${HELM_COMMON[@]}" >/dev/null
+  helm upgrade ingest-ms deploy/helm/ingest-ms "${HELM_COMMON[@]}" "${HELM_EXTRA_ARR[@]}" >/dev/null
   WANT=4
 fi
 for i in $(seq 1 120); do
@@ -38,7 +39,8 @@ QURL=$(queue_url "$QUEUE_NAME"); DLQURL=$(queue_url "$DLQ_NAME")
 # Pre-calentamiento (JIT, pools de conexión) y espera de estabilidad: sin esto el arranque en frío de la JVM (CPU > 150 %)
 # dispara el HPA antes de la prueba y el tiempo de escalado medido no tiene sentido (hallazgo del intento 1 de P2).
 log "Pre-calentamiento: ${PREWARM_RATE:-40} req/s durante ${PREWARM_S:-90} s"
-k6 run --quiet -e RUN_ID="prewarm-$RUN_ID" load/prewarm.js >/dev/null 2>&1 || true
+if [ "${LOADGEN:-host}" = "incluster" ]; then ./scripts/k6-incluster.sh up >/dev/null; ./scripts/k6-incluster.sh run load/prewarm.js "prewarm-$RUN_ID" >/dev/null 2>&1 || true
+else k6 run --quiet -e RUN_ID="prewarm-$RUN_ID" load/prewarm.js >/dev/null 2>&1 || true; fi
 rm -f "results/summaries/prewarm-$RUN_ID.json"
 if [ "$SC" != "p0" ]; then
   log "Esperando que el HPA se estabilice en $WANT réplicas con CPU < 60 % (máx ${STABLE_WAIT_S:-900} s)"
@@ -71,7 +73,9 @@ trap 'kill $SAMP1 $SAMP2 2>/dev/null || true; "${AWS[@]}" lambda update-event-so
 START=$(date +%s)
 echo "{\"scenario\":\"$SC\",\"run_id\":\"$RUN_ID\",\"k6_start\":$START,\"burst_offset_s\":$BURST_OFFSET}" > "$OUT/meta.json"
 log "k6 $FILE (RUN_ID=$RUN_ID)"
-set +e; k6 run -e RUN_ID="$RUN_ID" "$FILE" 2>&1 | tee "$OUT/k6.txt"; K6_RC=${PIPESTATUS[0]}; set -e
+if [ "${LOADGEN:-host}" = "incluster" ]; then
+  set +e; ./scripts/k6-incluster.sh run "$FILE" "$RUN_ID" ${K6_ENV:-} 2>&1 | tee "$OUT/k6.txt"; K6_RC=${PIPESTATUS[0]}; set -e
+else set +e; k6 run -e RUN_ID="$RUN_ID" "$FILE" 2>&1 | tee "$OUT/k6.txt"; K6_RC=${PIPESTATUS[0]}; set -e; fi
 END=$(date +%s); sed -i '' "s/}\$/,\"k6_end\":$END,\"k6_exit\":$K6_RC}/" "$OUT/meta.json"
 sleep 10; kill $SAMP1 $SAMP2 2>/dev/null || true
 kubectl get pods -o json > "$OUT/pods.json"; kubectl get events --sort-by=.lastTimestamp > "$OUT/events.txt" 2>&1 || true
@@ -100,5 +104,6 @@ rem=$(( $(q_attr "$QURL" ApproximateNumberOfMessages) + $(q_attr "$QURL" Approxi
 cp "$OUT/reconcile.txt" "results/summaries/$RUN_ID-reconcile.txt"
 
 # 6) Informe
+for kv in ${K6_ENV:-}; do export "$kv"; done   # el análisis necesita los mismos parámetros que k6 (STEP_S, etc.)
 $PY scripts/analyze.py "$OUT" > "results/summaries/$RUN_ID-informe.md"
 cat "results/summaries/$RUN_ID-informe.md"
