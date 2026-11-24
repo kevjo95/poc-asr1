@@ -12,7 +12,7 @@ if [ "${TARGET:-local}" = "aws" ]; then
 fi
 source scripts/lib.sh
 export KUBECONFIG="${KUBECONFIG:-$HOME/.kube/poc-asr1.yaml}"
-PY="${PY:-python3}"
+[ -x .venv/bin/python ] && PY="${PY:-.venv/bin/python}" || PY="${PY:-python3}"   # boto3 vive en .venv (lo crea dashboard.sh)
 SC="${1:?uso: run-scenario.sh p0|p1|p2|p3}"
 case "$SC" in p0) FILE=load/p0-calibracion.js; BURST_OFFSET=0;; p1) FILE=load/p1-base.js; BURST_OFFSET=0;;
               p2) FILE=load/p2-rafaga.js; BURST_OFFSET="${WARMUP_S:-300}";; p3) FILE=load/p3-estres.js; BURST_OFFSET=0;;
