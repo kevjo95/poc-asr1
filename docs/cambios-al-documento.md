@@ -39,6 +39,12 @@ Estado: **Confirmado** (hay evidencia ejecutada) · **Propuesto** (decisión de 
 | D3 | El servicio degrada **de golpe**, no gradualmente (0 % → 9 % → 88 % de errores en dos escalones): conviene escalar antes de saturar | P0 intento 2 | Confirmado |
 | D4 | El producto productivo nunca ha escalado en 67 días: la hipótesis solo se valida con carga sintética | spike-01 §2.3 | Confirmado |
 
+## F. Aporte adicional: AS-IS → TO-BE de configuración
+| # | Qué agregar | Evidencia | Estado |
+|---|---|---|---|
+| F1 | Sección con la tabla AS-IS (servicio de referencia) frente a TO-BE (MS de ingesta): CPU, hilos, log, memoria, *liveness*, HPA | `docs/as-is-to-be-configuracion.md` | En construcción |
+| F2 | Aclarar que la configuración de producción es una **línea base observada**, no un requisito: el MS de ingesta tiene un patrón de ráfagas distinto | ADR 0006; conversación del grupo | Propuesto |
+
 ## E. Pendiente de decidir con el grupo
 - Mantener el documento 100 % local o dejar abierta una corrida en AWS (el repo ya tiene el Terraform del destino AWS, solo validado).
 - Si el "tiempo de escalado" local debe presentarse como cumplimiento o solo como evidencia de la dinámica (la medición completa exige un nodo nuevo, que kind no tiene).
