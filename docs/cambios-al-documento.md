@@ -10,6 +10,7 @@ Estado: **Confirmado** (hay evidencia ejecutada) · **Propuesto** (decisión de 
 | A2 | §7.1 tabla: "Servicio AWS" → "Componente"; generador k6 en el equipo, no EC2; la "Función publicadora" pasa a **Lambda de conciliación** y va tras la cola | F1–F5 en `docs/scenarios/` | Confirmado |
 | A3 | §7.3 costos: la ejecución local no tiene costo en la nube; el costo de una corrida en AWS queda por definir | ADR 0003 | Propuesto |
 | A4 | Limitación 3: la Lambda y la idempotencia **sí participan**, en forma mínima | F2 (50 únicos + 10 duplicados → 50 `COMPLETADO`) | Confirmado |
+| A4b | **Decisión (23-nov):** en las pruebas de carga locales la Lambda queda fuera de la medición (pausada); solo se valida su funcionamiento en F2/F4 y en la muestra de conciliación. El tráfico combinado MS + Lambda se deja para una corrida en AWS, donde la Lambda escala sin competir por CPU con SQS | LocalStack procesa ~9 msg/s y contamina la latencia del MS | Decidido |
 | A5 | **Nueva limitación:** p99 y tiempo de escalado locales son *indicativos*, no comparables con producción (host, Docker Desktop, LocalStack comparten CPU; ver B3) | P0/P2 | Confirmado |
 | A6 | **Nueva limitación:** producción usa HTTP Basic y la PoC firma con HMAC (`X-Signature`) | spike-01 §3 #7 | Confirmado |
 
