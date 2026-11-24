@@ -12,3 +12,13 @@ Con 768 MiB (heap 512 MiB) el pod fue terminado por **OOMKilled** (código 137) 
 (metaspace, pilas, búferes directos, Tomcat) no escala de forma proporcional. Se sube el límite a **1 GiB** con el mismo heap y se
 añade `timeoutSeconds: 3` a las sondas, porque 1 s reinició el pod ante pausas de GC bajo carga. Los resultados de esa corrida
 (`p0-20261123-193100`) se descartan para dimensionar.
+
+## Enmienda 2 · tras el intento 1 de P2 (CPU)
+Con request **100m** el servicio consume ~3,6m de CPU por cada req/s: 4 pods superan el 80 % del request hacia ~90 req/s, de modo que el HPA
+reaccionaba al tráfico **base** (125/s) y no a la ráfaga. En producción el servicio está al ~1 % de CPU en reposo, así que el perfil
+reducido distorsionaba la dinámica que se quería validar.
+**Decisión:** request **300m** / límite **1000m** (memoria 1 GiB sin cambio). El umbral del HPA (80 % = 240m) cae en ~65 req/s por pod, es decir
+~265 req/s con 4 pods: el tráfico base de 125/s no escala y la ráfaga a 500/s sí.
+**Consecuencia:** la capacidad por réplica de P0 medida con 500m de límite deja de valer y se repite. Además cada corrida añade un **pre-calentamiento**
+(40 req/s, 90 s) y espera que el HPA se estabilice en 4 réplicas con CPU < 60 % antes de medir, porque el arranque en frío de la JVM (CPU > 150 %)
+dispara el escalado.
