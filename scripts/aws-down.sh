@@ -8,6 +8,7 @@ TF="infra/envs/aws-eks"; export KUBECONFIG="${KUBECONFIG_AWS:-$HOME/.kube/poc-as
 echo "Cuenta: $(aws sts get-caller-identity --query Arn --output text)"
 read -r -p "Escribe 'destruir' para borrar TODO el entorno de AWS de la PoC: " ok; [ "$ok" = "destruir" ] || { echo "Cancelado."; exit 1; }
 
+REGION="$(terraform -chdir="$TF" output -raw region 2>/dev/null || true)"; REGION="${REGION:-us-east-1}"   # antes del destroy: después ya no hay outputs
 echo "[1/3] Quitar el Service LoadBalancer antes del clúster (si no, el NLB queda huérfano y sigue cobrando)"
 helm uninstall ingest-ms 2>/dev/null || true
 helm uninstall cluster-autoscaler -n kube-system 2>/dev/null || true
@@ -18,7 +19,6 @@ echo "[2/3] terraform destroy"
 terraform -chdir="$TF" destroy
 
 echo "[3/3] Verificación de residuos (todo debe salir vacío o en 0)"
-REGION="$(terraform -chdir="$TF" output -raw region 2>/dev/null || echo us-east-1)"
 echo "- instancias EC2 activas (TODAS; los nodos de EKS no llevan la etiqueta project, solo eks:cluster-name):"
 aws ec2 describe-instances --region "$REGION" --filters Name=instance-state-name,Values=pending,running,stopping,stopped \
   --query 'Reservations[].Instances[].[InstanceId,InstanceType,State.Name]' --output text

@@ -98,3 +98,10 @@ Restricciones nuevas y su efecto en el diseño (**reemplazan las decisiones 2 y 
 - `run-scenario.sh` con `TARGET=aws`: Lambda activa, destino NLB interno, conciliación nivel 1 con CloudWatch `NumberOfMessagesSent`. **Probado solo con `bash -n` y en local; su primera ejecución real es en AWS.**
 - Panel de CloudWatch creado por Terraform (`cloudwatch-dashboard.tf`): el plan pasa a **64 a crear**.
 - Guion de grabación y recorrido de la consola: `docs/guion-video-aws.md`.
+
+## Cierre (24-nov): entorno destruido y verificado
+- **A2–A5 ejecutadas:** `apply` en dos pasos (base + nodo de carga y regla de seguridad), MS 0.2.1 desplegado, P2 y P3 corridos. Resultados: `docs/scenarios/P2-aws.md` y `P3-aws.md`.
+- **A7 hecha:** `terraform destroy` (72 recursos) y verificación independiente: 0 clústeres EKS, instancias, balanceadores, volúmenes, IP elásticas, NAT, colas, tablas, Lambdas, ECR y VPC propias. Queda solo el presupuesto manual de la cuenta.
+- **Pendiente:** revisar Cost Explorer al día siguiente (los datos tardan hasta 24 h) y anotar el costo real de la sesión.
+- **No cerrado:** nivel 2 de P3 (el entorno se destruyó con ~58 000 mensajes aún en cola; DLQ 0 y sin pérdidas observadas); el nivel 1 sí se cerró.
+- **Sesión:** del `apply` (04:38 UTC) al `destroy` (~07:13 UTC) fueron unas 2,6 h de infraestructura encendida.
