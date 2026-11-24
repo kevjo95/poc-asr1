@@ -2,7 +2,7 @@
 #   --set image.repository=<url de ECR>  --set config.queueUrl=<url de la cola>
 #   --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=<rol IRSA>  --set hmacSecret=<secreto>
 image:
-  tag: "0.2.0"
+  tag: "0.2.1"
   pullPolicy: Always
 
 # Perfil de producción observado (ADR 0006): request 200m / límite 2000m y 3096 MiB con heap de 2 GiB.

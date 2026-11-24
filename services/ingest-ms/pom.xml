@@ -10,7 +10,7 @@
   </parent>
   <groupId>edu.poc.asr1</groupId>
   <artifactId>ingest-ms</artifactId>
-  <version>0.2.0</version>
+  <version>0.2.1</version>
   <name>ingest-ms</name>
   <description>MS de ingesta de webhooks (PoC ASR1, uso académico)</description>
 
@@ -51,6 +51,10 @@
     <dependency>
       <groupId>software.amazon.awssdk</groupId>
       <artifactId>apache-client</artifactId>
+    </dependency>
+    <dependency>  <!-- necesario para IRSA en EKS (credenciales por web identity token); sin él el SDK cae al rol del nodo -->
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>sts</artifactId>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
