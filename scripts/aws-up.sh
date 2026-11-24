@@ -9,7 +9,7 @@ TF="infra/envs/aws-eks"
 out() { terraform -chdir="$TF" output -raw "$1"; }
 
 echo "[0/6] Identidad (debe ser tu cuenta PERSONAL):"; aws sts get-caller-identity --query Arn --output text
-read -r -p "¿Es la cuenta personal correcta? (si/no) " ok; [ "$ok" = "si" ] || { echo "Cancelado."; exit 1; }
+case "$(aws sts get-caller-identity --query Arn --output text)" in *user/kevjo-poc) ;; *) echo "Identidad inesperada: detente."; exit 1;; esac   # solo el usuario de la cuenta personal
 
 REGION="$(out region)"; CLUSTER="$(out cluster_name)"; ECR="$(out ecr_repository_url)"
 QUEUE_URL="$(out queue_url)"; INGEST_ROLE="$(out ingest_role_arn)"; CA_ROLE="$(out autoscaler_role_arn)"
@@ -28,6 +28,7 @@ echo "[3/6] metrics-server"
 kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.7.2/components.yaml >/dev/null
 kubectl -n kube-system rollout status deploy/metrics-server --timeout=180s >/dev/null
 
+if [ "${SKIP_CA:-0}" = "1" ]; then echo "[4/6] Cluster Autoscaler omitido (SKIP_CA=1)"; else
 echo "[4/6] Cluster Autoscaler (CA_IMAGE_TAG debe coincidir con la versión menor de Kubernetes del clúster, p. ej. v1.XX.0)"
 helm repo add autoscaler https://kubernetes.github.io/autoscaler >/dev/null 2>&1 || true; helm repo update >/dev/null
 helm upgrade --install cluster-autoscaler autoscaler/cluster-autoscaler -n kube-system \
@@ -36,6 +37,7 @@ helm upgrade --install cluster-autoscaler autoscaler/cluster-autoscaler -n kube-
   --set "rbac.serviceAccount.annotations.eks\.amazonaws\.com/role-arn=$CA_ROLE" \
   --set extraArgs.balance-similar-node-groups=true --set extraArgs.skip-nodes-with-system-pods=false \
   ${CA_IMAGE_TAG:+--set image.tag="$CA_IMAGE_TAG"} >/dev/null
+fi
 
 echo "[5/6] MS de ingesta"
 SECRET="${INGEST_HMAC_SECRET:-$(openssl rand -hex 16)}"
