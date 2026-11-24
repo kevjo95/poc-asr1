@@ -1,0 +1,38 @@
+image:
+  repository: poc-asr1/ingest-ms
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+# Perfil reducido en proporción (ADR 0006). En AWS/producción usar 200m / 2000m y 3096Mi.
+resources:
+  requests: { cpu: 100m, memory: 768Mi }
+  limits:   { cpu: 500m, memory: 768Mi }
+javaOpts: "-Xss256k -Xmx512m -Xms512m -XX:+UseG1GC"
+
+# HPA idéntico al observado en producción (ADR 0004).
+autoscaling:
+  enabled: true
+  minReplicas: 4
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 80
+  behavior:
+    scaleUp:   { stabilizationWindowSeconds: 0,   pods: 4, periodSeconds: 90 }
+    scaleDown: { stabilizationWindowSeconds: 300, pods: 4, periodSeconds: 90 }
+replicaCount: 4            # solo se usa si autoscaling.enabled=false (escenario P0)
+
+service:
+  type: NodePort
+  port: 8080
+  nodePort: 30080
+
+config:
+  queueUrl: ""
+  sqsEndpoint: ""          # vacío en AWS
+  sqsTimeoutMs: "2000"
+  sqsMaxConcurrency: "200"
+  region: us-east-1
+  # Solo para LocalStack. En AWS se usa el rol del pod (IRSA) y esto queda vacío.
+  localAwsCredentials: false
+
+# Secreto HMAC: se pasa con --set hmacSecret=... (nunca se versiona).
+hmacSecret: ""

@@ -1,0 +1,11 @@
+# Clúster local de la PoC: 1 plano de control + 3 workers (8 pods reducidos caben en ~6 GiB).
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: poc-asr1
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - { containerPort: 30080, hostPort: 8080, listenAddress: "127.0.0.1", protocol: TCP }
+  - role: worker
+  - role: worker
+  - role: worker

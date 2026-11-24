@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ingest-ms.name" . }}
+  labels: {{- include "ingest-ms.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "ingest-ms.name" . }}
+  template:
+    metadata:
+      labels: {{- include "ingest-ms.labels" . | nindent 8 }}
+    spec:
+      terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:          # reparte réplicas entre nodos, como en producción
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ include "ingest-ms.name" . }}
+      containers:
+        - name: ingest-ms
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - { name: http, containerPort: 8080 }
+          env:
+            - { name: JAVA_OPTS, value: {{ .Values.javaOpts | quote }} }
+            - { name: AWS_REGION, value: {{ .Values.config.region | quote }} }
+            - { name: INGEST_QUEUE_URL, value: {{ .Values.config.queueUrl | quote }} }
+            - { name: INGEST_SQS_ENDPOINT, value: {{ .Values.config.sqsEndpoint | quote }} }
+            - { name: INGEST_SQS_TIMEOUT_MS, value: {{ .Values.config.sqsTimeoutMs | quote }} }
+            - { name: INGEST_SQS_MAX_CONCURRENCY, value: {{ .Values.config.sqsMaxConcurrency | quote }} }
+            {{- if .Values.config.localAwsCredentials }}
+            - { name: AWS_ACCESS_KEY_ID, value: "test" }
+            - { name: AWS_SECRET_ACCESS_KEY, value: "test" }
+            {{- end }}
+          envFrom:
+            - secretRef: { name: {{ include "ingest-ms.name" . }}-hmac }
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          startupProbe:                     # permite medir el arranque hasta "healthy"
+            httpGet: { path: /actuator/health/readiness, port: http }
+            periodSeconds: 2
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: http }
+            periodSeconds: 10

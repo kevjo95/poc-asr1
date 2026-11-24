@@ -15,7 +15,7 @@ Fuera: API Gateway, WAF, bus, consumidores y la malla de servicios.
 - [x] H1 · Infraestructura como código en dos destinos (`infra/envs/local` y `infra/envs/aws`), verificada en LocalStack
 - [x] H2 · Lambda de conciliación con idempotencia (EN_PROCESO / COMPLETADO) y pruebas
 - [x] H3 · MS de ingesta (contrato 202/400/401/503, HMAC, ACK tras persistir) y pruebas
-- [ ] H4 · Chart de Helm con HPA igual a producción; clúster kind (requiere >= 16 GiB en Docker)
+- [x] H4 · Chart de Helm con HPA igual a producción; clúster kind (requiere >= 16 GiB en Docker)
 - [ ] H5 · Carga con k6 (P0..P3) y conciliación; evidencias por escenario
 - [ ] H6 · Revisión del documento de la entrega con resultados
 
