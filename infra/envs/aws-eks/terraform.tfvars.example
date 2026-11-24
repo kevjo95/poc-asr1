@@ -1,0 +1,4 @@
+# Copia a terraform.tfvars (ignorado por Git) y completa. No subas valores reales al repositorio.
+aws_profile     = "poc-asr1"
+budget_email    = "tu-correo-personal@example.com"
+cluster_version = "REEMPLAZAR"   # ver la descripción de la variable para elegir una versión en soporte estándar

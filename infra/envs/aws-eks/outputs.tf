@@ -1,0 +1,10 @@
+output "cluster_name" { value = module.eks.cluster_name }
+output "region" { value = var.region }
+output "ecr_repository_url" { value = aws_ecr_repository.ingest.repository_url }
+output "queue_url" { value = module.stack.queue_url }
+output "queue_name" { value = module.stack.queue_name }
+output "dlq_url" { value = module.stack.dlq_url }
+output "table_name" { value = module.stack.table_name }
+output "function_name" { value = module.stack.function_name }
+output "ingest_role_arn" { value = module.ingest_irsa.iam_role_arn }
+output "autoscaler_role_arn" { value = module.autoscaler_irsa.iam_role_arn }

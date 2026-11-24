@@ -1,0 +1,28 @@
+# Valores para EKS (se combinan con values.yaml). Ver scripts/aws-up.sh, que completa lo que depende de la cuenta:
+#   --set image.repository=<url de ECR>  --set config.queueUrl=<url de la cola>
+#   --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=<rol IRSA>  --set hmacSecret=<secreto>
+image:
+  tag: "0.2.0"
+  pullPolicy: Always
+
+# Perfil de producción observado (ADR 0006): request 200m / límite 2000m y 3096 MiB con heap de 2 GiB.
+resources:
+  requests: { cpu: 200m, memory: 3096Mi }
+  limits:   { cpu: 2000m, memory: 3096Mi }
+javaOpts: "-Xss256k -Xmx2g -Xms2g -XX:+UseG1GC"
+
+config:
+  sqsEndpoint: ""            # SQS real
+  localAwsCredentials: false # credenciales del rol del pod (IRSA)
+
+serviceAccount:
+  create: true
+
+nodeSelector:
+  role: ms
+
+service:
+  type: LoadBalancer
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/aws-load-balancer-internal: "true"

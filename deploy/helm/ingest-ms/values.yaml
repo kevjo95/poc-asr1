@@ -20,7 +20,14 @@ autoscaling:
     scaleDown: { stabilizationWindowSeconds: 300, pods: 4, periodSeconds: 90 }
 replicaCount: 4            # solo se usa si autoscaling.enabled=false (escenario P0)
 
+serviceAccount:
+  create: false            # en AWS: true, con la anotación del rol IRSA (ver values-aws.yaml)
+  annotations: {}
+nodeSelector: {}
+tolerations: []
+
 service:
+  annotations: {}
   type: NodePort
   port: 8080
   nodePort: 30080

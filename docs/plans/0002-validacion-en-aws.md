@@ -33,7 +33,7 @@ Riesgo principal: **olvidar destruir**. Mitigación: alarma de presupuesto (ya e
 - [ ] **A0 · Requisitos (tú).** Cuenta personal de AWS con método de pago; usuario/rol administrativo temporal vía IAM Identity Center (`aws configure sso`) o usuario IAM propio;
   confirmar el límite de vCPU de instancias bajo demanda (cuentas nuevas a veces parten con pocas) y pedir aumento si hace falta.
   **Nunca usar un perfil de trabajo.** Criterio: `aws sts get-caller-identity --profile <perfil>` muestra tu cuenta personal.
-- [ ] **A1 · IaC, solo escribir y planificar (yo).** Nuevo entorno `infra/envs/aws-eks` y módulos `network`, `eks`, `ecr`, `irsa`. Decisión por aprobar: usar los módulos públicos
+- [x] **A1 · IaC, solo escribir y validar (hecho el 23-nov, sin cuenta).** Nuevo entorno `infra/envs/aws-eks` y módulos `network`, `eks`, `ecr`, `irsa`. Decisión por aprobar: usar los módulos públicos
   `terraform-aws-modules` (más rápido, nueva dependencia) o recursos propios (más líneas, sin dependencia). Criterio: `terraform validate` y `terraform plan` limpios, plan revisado por ti.
 - [ ] **A2 · Aplicar la base (yo, con tu OK).** Red, EKS, ECR, cola, tabla, Lambda y alarma de presupuesto. Criterio: nodos `Ready`, `kubectl get nodes` y el correo de la alarma confirmado.
 - [ ] **A3 · Desplegar el MS (yo).** Subir imagen a ECR, instalar metrics-server y Cluster Autoscaler, Helm con el perfil de producción y IRSA. Criterio: 4 pods `Ready` y `202` real contra la SQS de AWS.
@@ -59,3 +59,23 @@ Si no se cumplen, se documenta la causa y la recomendación de cambio (como en e
 1. ¿Apruebas este alcance y el orden de fases?
 2. ¿Módulos públicos de Terraform (más rápido) o recursos propios (sin dependencia nueva)?
 3. ¿Cuándo tendrías la cuenta y el perfil listos (A0)? No avanzo a A2 sin eso.
+
+## Estado de A1 (preparado sin tocar AWS)
+Hecho y validado localmente (`terraform validate`, `terraform fmt`, `helm lint` y `helm template`); **no se ha ejecutado `plan` ni `apply`** porque requieren credenciales.
+
+| Pieza | Dónde |
+|---|---|
+| Terraform: VPC pública, EKS (módulo 20.37.2), 2 grupos de nodos, ECR, IRSA, cola/DLQ/tabla/Lambda, presupuesto | `infra/envs/aws-eks/` |
+| Chart: ServiceAccount con rol IRSA, `nodeSelector`, NLB interno, perfil de producción | `deploy/helm/ingest-ms/values-aws.yaml` |
+| Subir y desplegar el MS; bajar y verificar residuos | `scripts/aws-up.sh`, `scripts/aws-down.sh` |
+| k6 en el grupo de nodos de carga | `K6_TARGET=aws ./scripts/k6-incluster.sh` |
+
+**Decisiones tomadas al prepararlo (revisables):**
+1. **Módulos públicos** `terraform-aws-modules` (vpc 5.21.0, eks 20.37.2, iam 5.60.0), fijados a las versiones cuya interfaz se conoce; nueva dependencia aceptada por defecto, se puede reemplazar por recursos propios.
+2. **Nodos Graviton (arm64)** `m7g.large` para el MS y `c7g.xlarge` para el generador: la imagen se compila en Apple Silicon (arm64) y así evita imágenes multi-arquitectura; además es más barato por hora.
+3. **Nodos llenos a propósito:** con 3096 MiB por pod caben 2 por nodo; 4 pods llenan los 2 nodos mínimos y la ráfaga obliga al Cluster Autoscaler a crear nodos nuevos. Es la medición de nodo nuevo que kind no puede dar.
+4. **`cluster_version` sin valor por defecto:** una versión fuera del soporte estándar cuesta ~6 veces más por hora en el plano de control. Se elige tras consultar `aws eks describe-cluster-versions`.
+5. **Sin NAT Gateway** y balanceador **interno**: el generador corre dentro de la VPC.
+
+**Pendiente para A5 (carga en AWS):** adaptar `run-scenario.sh` para AWS (conciliación contra `NumberOfMessagesSent` de CloudWatch, Lambda activa, sin `kind`), y el dashboard para leer SQS real.
+**Riesgos conocidos a verificar con la cuenta:** que la imagen del Cluster Autoscaler coincida con la versión de Kubernetes (`CA_IMAGE_TAG`), que 2 pods de 3096 MiB quepan por nodo `m7g.large` (memoria asignable), y la cuota de vCPU.

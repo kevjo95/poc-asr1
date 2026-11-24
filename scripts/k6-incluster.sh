@@ -7,10 +7,17 @@ export KUBECONFIG="${KUBECONFIG:-$HOME/.kube/poc-asr1.yaml}"
 IMG="grafana/k6:${K6_IMAGE_TAG:-1.4.0}"; POD=k6-runner
 case "${1:?up|down|run}" in
   up)
-    docker image inspect "$IMG" >/dev/null 2>&1 || docker pull -q "$IMG" >/dev/null
-    kind load docker-image "$IMG" --name poc-asr1 >/dev/null
-    kubectl get pod $POD >/dev/null 2>&1 || kubectl run $POD --image="$IMG" --image-pull-policy=IfNotPresent --restart=Never \
-      --labels=app=k6-runner --command -- sleep infinity >/dev/null
+    if [ "${K6_TARGET:-kind}" = "aws" ]; then
+      # En EKS el pod va al grupo de nodos de carga (con taint) y descarga la imagen pública (multi-arquitectura).
+      kubectl get pod $POD >/dev/null 2>&1 || kubectl run $POD --image="$IMG" --restart=Never --labels=app=k6-runner \
+        --overrides='{"spec":{"nodeSelector":{"role":"load"},"tolerations":[{"key":"load","operator":"Equal","value":"true","effect":"NoSchedule"}]}}' \
+        --command -- sleep infinity >/dev/null
+    else
+      docker image inspect "$IMG" >/dev/null 2>&1 || docker pull -q "$IMG" >/dev/null
+      kind load docker-image "$IMG" --name poc-asr1 >/dev/null
+      kubectl get pod $POD >/dev/null 2>&1 || kubectl run $POD --image="$IMG" --image-pull-policy=IfNotPresent --restart=Never \
+        --labels=app=k6-runner --command -- sleep infinity >/dev/null
+    fi
     kubectl wait --for=condition=Ready pod/$POD --timeout=120s >/dev/null; echo "k6-runner listo" ;;
   down) kubectl delete pod $POD --ignore-not-found >/dev/null; echo "k6-runner eliminado" ;;
   run)
