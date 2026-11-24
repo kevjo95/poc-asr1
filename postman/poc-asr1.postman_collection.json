@@ -1,0 +1,906 @@
+{
+  "info": {
+    "_postman_id": "e88638eb-206a-42aa-97f7-ab9b2134c0b9",
+    "name": "PoC ASR1 · MS de ingesta",
+    "description": "Pruebas del MS de ingesta de webhooks (datos sintéticos, uso académico). La firma HMAC se calcula en el pre-request del colección. Requiere el entorno local en marcha (scripts/cluster-up.sh).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Firma HMAC automática. El modo de cada petición se indica con el header marcador X-Test-Mode:",
+          "// valid (por defecto) | bad-sig | no-sig | dup | id-mismatch",
+          "const mode = pm.request.headers.get('X-Test-Mode') || 'valid';",
+          "pm.request.headers.remove('X-Test-Mode');",
+          "",
+          "let id = 'pm-' + Date.now() + '-' + Math.floor(Math.random() * 1e6);",
+          "if (mode === 'dup') {",
+          "  if (!pm.collectionVariables.get('dupId')) { pm.collectionVariables.set('dupId', id); }",
+          "  id = pm.collectionVariables.get('dupId');",
+          "}",
+          "pm.variables.set('eventId', id);",
+          "",
+          "const cjs = require('crypto-js');",
+          "const raw = pm.request.body && pm.request.body.raw ? pm.variables.replaceIn(pm.request.body.raw) : '';",
+          "const secret = pm.environment.get('hmacSecret') || pm.collectionVariables.get('hmacSecret');",
+          "const hex = cjs.HmacSHA256(raw, secret).toString(cjs.enc.Hex);",
+          "",
+          "if (pm.request.url.getPath().startsWith('/webhooks/')) {",
+          "  if (mode === 'no-sig') { pm.request.headers.remove('X-Signature'); }",
+          "  else if (mode === 'bad-sig') { pm.request.headers.upsert({ key: 'X-Signature', value: 'sha256=deadbeef' }); }",
+          "  else { pm.request.headers.upsert({ key: 'X-Signature', value: 'sha256=' + hex }); }",
+          "  if (mode === 'id-mismatch') { pm.request.headers.upsert({ key: 'X-Event-Id', value: 'otro-id' }); }",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "localstackUrl",
+      "value": "http://localhost:4566"
+    },
+    {
+      "key": "tableName",
+      "value": "poc-asr1-idempotency"
+    },
+    {
+      "key": "hmacSecret",
+      "value": "poc-local-secret"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 · Salud y métricas",
+      "item": [
+        {
+          "name": "Salud (readiness)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Status UP', () => pm.expect(pm.response.json().status).to.eql('UP'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health/readiness",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health",
+                "readiness"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Salud (liveness)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health/liveness",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health",
+                "liveness"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 · Caminos felices (202)",
+      "item": [
+        {
+          "name": "202 · argyle",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 202', () => pm.response.to.have.status(202));",
+                  "pm.collectionVariables.set('lastEventId', pm.variables.get('eventId'));",
+                  "pm.test('Devuelve el eventId', () => pm.expect(pm.response.json().eventId).to.eql(pm.variables.get('eventId')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Event-Id",
+                "value": "{{eventId}}"
+              },
+              {
+                "key": "X-Signature",
+                "value": "placeholder"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"eventId\":\"{{eventId}}\",\"type\":\"deposit.settled\",\"occurredAt\":\"2026-12-01T13:00:00Z\",\"accountId\":\"acc_1\",\"amount\":{\"value\":1250.75,\"currency\":\"USD\"}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/argyle",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "argyle"
+              ]
+            },
+            "description": "Firma y cuerpo válidos. Debe confirmar solo después de persistir en SQS."
+          }
+        },
+        {
+          "name": "202 · central-payments",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 202', () => pm.response.to.have.status(202));",
+                  "pm.test('Devuelve el eventId', () => pm.expect(pm.response.json().eventId).to.eql(pm.variables.get('eventId')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Event-Id",
+                "value": "{{eventId}}"
+              },
+              {
+                "key": "X-Signature",
+                "value": "placeholder"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"eventId\":\"{{eventId}}\",\"type\":\"deposit.settled\",\"occurredAt\":\"2026-12-01T13:00:00Z\",\"accountId\":\"acc_1\",\"amount\":{\"value\":1250.75,\"currency\":\"USD\"}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/central-payments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "central-payments"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 · Verificación de procesamiento (LocalStack)",
+      "item": [
+        {
+          "name": "Evento del 202 argyle → COMPLETADO",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Espera a que la Lambda procese el evento (reintenta la misma petición hasta 10 veces).",
+                  "const n = parseInt(pm.collectionVariables.get('poll_lastEventId') || '0');",
+                  "if (n > 0) { setTimeout(() => {}, 1500); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const estado = body.Item && body.Item.status ? body.Item.status.S : null;",
+                  "const key = 'poll_lastEventId';",
+                  "const n = parseInt(pm.collectionVariables.get(key) || '0');",
+                  "if (estado !== 'COMPLETADO' && n < 10) {",
+                  "  pm.collectionVariables.set(key, String(n + 1));",
+                  "  pm.execution.setNextRequest(pm.info.requestName);",
+                  "} else {",
+                  "  pm.collectionVariables.unset(key);",
+                  "  pm.test('El evento quedó COMPLETADO en la tabla de idempotencia', () => pm.expect(estado).to.eql('COMPLETADO'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-amz-json-1.0"
+              },
+              {
+                "key": "X-Amz-Target",
+                "value": "DynamoDB_20120810.GetItem"
+              },
+              {
+                "key": "Authorization",
+                "value": "AWS4-Hmac-SHA256 Credential=test/20260101/us-east-1/dynamodb/aws4_request, SignedHeaders=host, Signature=x"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"TableName\":\"{{tableName}}\",\"Key\":{\"eventId\":{\"S\":\"{{lastEventId}}\"}}}"
+            },
+            "url": {
+              "raw": "{{localstackUrl}}/",
+              "host": [
+                "{{localstackUrl}}"
+              ],
+              "path": [
+                ""
+              ]
+            },
+            "description": "Consulta DynamoDB en LocalStack hasta ver COMPLETADO."
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 · Rechazos (4xx)",
+      "item": [
+        {
+          "name": "401 · firma inválida",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Event-Id",
+                "value": "{{eventId}}"
+              },
+              {
+                "key": "X-Signature",
+                "value": "placeholder"
+              },
+              {
+                "key": "X-Test-Mode",
+                "value": "bad-sig"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"eventId\":\"{{eventId}}\",\"type\":\"deposit.settled\",\"occurredAt\":\"2026-12-01T13:00:00Z\",\"accountId\":\"acc_1\",\"amount\":{\"value\":1250.75,\"currency\":\"USD\"}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/argyle",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "argyle"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "401 · sin firma",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Event-Id",
+                "value": "{{eventId}}"
+              },
+              {
+                "key": "X-Signature",
+                "value": "placeholder"
+              },
+              {
+                "key": "X-Test-Mode",
+                "value": "no-sig"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"eventId\":\"{{eventId}}\",\"type\":\"deposit.settled\",\"occurredAt\":\"2026-12-01T13:00:00Z\",\"accountId\":\"acc_1\",\"amount\":{\"value\":1250.75,\"currency\":\"USD\"}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/argyle",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "argyle"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "400 · JSON inválido",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Event-Id",
+                "value": "{{eventId}}"
+              },
+              {
+                "key": "X-Signature",
+                "value": "placeholder"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{no es json",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/argyle",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "argyle"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "400 · campo obligatorio ausente",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Event-Id",
+                "value": "{{eventId}}"
+              },
+              {
+                "key": "X-Signature",
+                "value": "placeholder"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"eventId\":\"{{eventId}}\",\"type\":\"x\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/argyle",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "argyle"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "400 · X-Event-Id distinto del cuerpo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Event-Id",
+                "value": "{{eventId}}"
+              },
+              {
+                "key": "X-Signature",
+                "value": "placeholder"
+              },
+              {
+                "key": "X-Test-Mode",
+                "value": "id-mismatch"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"eventId\":\"{{eventId}}\",\"type\":\"deposit.settled\",\"occurredAt\":\"2026-12-01T13:00:00Z\",\"accountId\":\"acc_1\",\"amount\":{\"value\":1250.75,\"currency\":\"USD\"}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/argyle",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "argyle"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "404 · fuente desconocida",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Event-Id",
+                "value": "{{eventId}}"
+              },
+              {
+                "key": "X-Signature",
+                "value": "placeholder"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"eventId\":\"{{eventId}}\",\"type\":\"deposit.settled\",\"occurredAt\":\"2026-12-01T13:00:00Z\",\"accountId\":\"acc_1\",\"amount\":{\"value\":1250.75,\"currency\":\"USD\"}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/otra-fuente",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "otra-fuente"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 · Idempotencia (duplicado)",
+      "item": [
+        {
+          "name": "Duplicado · 1er envío",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 202', () => pm.response.to.have.status(202));",
+                  "pm.test('Devuelve el eventId', () => pm.expect(pm.response.json().eventId).to.eql(pm.variables.get('eventId')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Event-Id",
+                "value": "{{eventId}}"
+              },
+              {
+                "key": "X-Signature",
+                "value": "placeholder"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"eventId\":\"{{eventId}}\",\"type\":\"deposit.settled\",\"occurredAt\":\"2026-12-01T13:00:00Z\",\"accountId\":\"acc_1\",\"amount\":{\"value\":1250.75,\"currency\":\"USD\"}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/argyle",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "argyle"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Duplicado · 2º envío (mismo eventId)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 202', () => pm.response.to.have.status(202));",
+                  "pm.test('Devuelve el eventId', () => pm.expect(pm.response.json().eventId).to.eql(pm.variables.get('eventId')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Event-Id",
+                "value": "{{eventId}}"
+              },
+              {
+                "key": "X-Signature",
+                "value": "placeholder"
+              },
+              {
+                "key": "X-Test-Mode",
+                "value": "dup"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"eventId\":\"{{eventId}}\",\"type\":\"deposit.settled\",\"occurredAt\":\"2026-12-01T13:00:00Z\",\"accountId\":\"acc_1\",\"amount\":{\"value\":1250.75,\"currency\":\"USD\"}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/argyle",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "argyle"
+              ]
+            },
+            "description": "El MS acepta (202); la Lambda descarta el duplicado."
+          }
+        },
+        {
+          "name": "Duplicado → una sola fila COMPLETADO",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Espera a que la Lambda procese el evento (reintenta la misma petición hasta 10 veces).",
+                  "const n = parseInt(pm.collectionVariables.get('poll_dupId') || '0');",
+                  "if (n > 0) { setTimeout(() => {}, 1500); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const estado = body.Item && body.Item.status ? body.Item.status.S : null;",
+                  "const key = 'poll_dupId';",
+                  "const n = parseInt(pm.collectionVariables.get(key) || '0');",
+                  "if (estado !== 'COMPLETADO' && n < 10) {",
+                  "  pm.collectionVariables.set(key, String(n + 1));",
+                  "  pm.execution.setNextRequest(pm.info.requestName);",
+                  "} else {",
+                  "  pm.collectionVariables.unset(key);",
+                  "  pm.test('El evento quedó COMPLETADO en la tabla de idempotencia', () => pm.expect(estado).to.eql('COMPLETADO'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-amz-json-1.0"
+              },
+              {
+                "key": "X-Amz-Target",
+                "value": "DynamoDB_20120810.GetItem"
+              },
+              {
+                "key": "Authorization",
+                "value": "AWS4-Hmac-SHA256 Credential=test/20260101/us-east-1/dynamodb/aws4_request, SignedHeaders=host, Signature=x"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"TableName\":\"{{tableName}}\",\"Key\":{\"eventId\":{\"S\":\"{{dupId}}\"}}}"
+            },
+            "url": {
+              "raw": "{{localstackUrl}}/",
+              "host": [
+                "{{localstackUrl}}"
+              ],
+              "path": [
+                ""
+              ]
+            },
+            "description": "El eventId duplicado termina COMPLETADO una vez."
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 · Métricas del MS",
+      "item": [
+        {
+          "name": "Métrica ingest_sqs_send_latency",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Estado 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Expone la métrica de latencia a SQS', () => pm.expect(pm.response.text()).to.include('ingest_sqs_send_latency'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/prometheus",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "prometheus"
+              ]
+            },
+            "description": "Corre después de los envíos para que la métrica ya exista."
+          }
+        }
+      ]
+    },
+    {
+      "name": "99 · Manual (503)",
+      "description": "Requiere `docker pause poc-asr1-localstack` antes de ejecutar y `docker unpause` después. Pon simulateSqsDown=true en el environment para activarla; si no, se omite.",
+      "item": [
+        {
+          "name": "503 · SQS no confirma",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const active = pm.environment.get('simulateSqsDown') === 'true';",
+                  "const t = active ? pm.test : pm.test.skip;",
+                  "t('Estado 503 con Retry-After', () => {",
+                  "  pm.response.to.have.status(503);",
+                  "  pm.expect(pm.response.headers.get('Retry-After')).to.eql('5');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Event-Id",
+                "value": "{{eventId}}"
+              },
+              {
+                "key": "X-Signature",
+                "value": "placeholder"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"eventId\":\"{{eventId}}\",\"type\":\"deposit.settled\",\"occurredAt\":\"2026-12-01T13:00:00Z\",\"accountId\":\"acc_1\",\"amount\":{\"value\":1250.75,\"currency\":\"USD\"}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/argyle",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "argyle"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

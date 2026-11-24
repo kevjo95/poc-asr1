@@ -79,5 +79,9 @@ La cola debe quedar en 0 y la DLQ vacía.
 ## 8. Escenarios automáticos
 `./scripts/f2-idempotencia.sh` · `./scripts/f3-contrato.sh` (requiere `BAD_URL`, ver su ficha) · `./scripts/f4-cero-perdidos.sh`
 
-## 9. Limpieza
+## 9. Colección de Postman
+Importa `postman/poc-asr1.postman_collection.json` y `postman/local.postman_environment.json` (ver `postman/README.md`):
+ejecuta los pasos 1 a 6 con aserciones y firma automática.
+
+## 10. Limpieza
 `./scripts/cluster-down.sh`
