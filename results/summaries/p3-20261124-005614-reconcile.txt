@@ -1,0 +1,3 @@
+Nivel 1 · 202 contados por k6 = 597989 · mensajes persistidos en SQS = 597989 · diferencia = 0
+Nivel 2 · procesado por la Lambda: COMPLETADO=202957, EN_PROCESO=6, DLQ=0, pendientes en cola=400259
+         (backlog parcial; se espera EN_PROCESO=0 y DLQ=0)
