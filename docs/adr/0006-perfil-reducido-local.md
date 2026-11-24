@@ -31,3 +31,7 @@ Con el servicio ya caliente, **request 100m** deja el umbral del HPA (80m) en ~8
 queda en ~31 % y los 125 req/s por pod de la ráfaga en ~125 %, de modo que el HPA sí reacciona a la ráfaga y no a la base.
 **Decisión:** request **100m**, límite **1000m** (relación 1:10 como en producción, 200m/2000m); memoria 1 GiB. El intento 1 de P2 escaló
 por el arranque en frío, no por la carga base; el pre-calentamiento (enmienda 2) ya lo corrige y se mantiene.
+
+## Enmienda 4 · límite de CPU 2000m
+La JVM ve tantos CPUs como el límite del contenedor: con ≤ 1000m ve 1 y la réplica aguanta ~200-300 req/s; con 2000m ve 2 y aguanta ~400 (experimento E0-E3).
+Producción usa 2000m. **Decisión final del perfil local:** request 100m / **límite 2000m** / memoria 1 GiB (heap 512 MiB).

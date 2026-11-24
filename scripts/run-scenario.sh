@@ -20,11 +20,11 @@ log() { echo "[$(date +%H:%M:%S)] $*"; }
 # 1) Estado del MS según el escenario
 if [ "$SC" = "p0" ]; then
   log "P0: HPA apagado y 1 réplica fija"
-  helm upgrade ingest-ms deploy/helm/ingest-ms "${HELM_COMMON[@]}" --set autoscaling.enabled=false --set replicaCount=1 "${HELM_EXTRA_ARR[@]}" >/dev/null
+  helm upgrade ingest-ms deploy/helm/ingest-ms "${HELM_COMMON[@]}" --set autoscaling.enabled=false --set replicaCount=1 ${HELM_EXTRA_ARR[@]+"${HELM_EXTRA_ARR[@]}"} >/dev/null
   WANT=1
 else
   log "$SC: HPA activo; esperando el mínimo de 4 réplicas (la bajada del HPA puede tardar ~5 min)"
-  helm upgrade ingest-ms deploy/helm/ingest-ms "${HELM_COMMON[@]}" "${HELM_EXTRA_ARR[@]}" >/dev/null
+  helm upgrade ingest-ms deploy/helm/ingest-ms "${HELM_COMMON[@]}" ${HELM_EXTRA_ARR[@]+"${HELM_EXTRA_ARR[@]}"} >/dev/null
   WANT=4
 fi
 for i in $(seq 1 120); do
@@ -72,10 +72,12 @@ trap 'kill $SAMP1 $SAMP2 2>/dev/null || true; "${AWS[@]}" lambda update-event-so
 # 4) Carga
 START=$(date +%s)
 echo "{\"scenario\":\"$SC\",\"run_id\":\"$RUN_ID\",\"k6_start\":$START,\"burst_offset_s\":$BURST_OFFSET}" > "$OUT/meta.json"
+echo "{\"scenario\":\"$SC\",\"start\":$START}" > results/raw/.current-scenario   # lo lee el dashboard
 log "k6 $FILE (RUN_ID=$RUN_ID)"
 if [ "${LOADGEN:-host}" = "incluster" ]; then
   set +e; ./scripts/k6-incluster.sh run "$FILE" "$RUN_ID" ${K6_ENV:-} 2>&1 | tee "$OUT/k6.txt"; K6_RC=${PIPESTATUS[0]}; set -e
 else set +e; k6 run -e RUN_ID="$RUN_ID" "$FILE" 2>&1 | tee "$OUT/k6.txt"; K6_RC=${PIPESTATUS[0]}; set -e; fi
+rm -f results/raw/.current-scenario
 END=$(date +%s); sed -i '' "s/}\$/,\"k6_end\":$END,\"k6_exit\":$K6_RC}/" "$OUT/meta.json"
 sleep 10; kill $SAMP1 $SAMP2 2>/dev/null || true
 kubectl get pods -o json > "$OUT/pods.json"; kubectl get events --sort-by=.lastTimestamp > "$OUT/events.txt" 2>&1 || true

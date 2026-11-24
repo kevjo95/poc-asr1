@@ -99,6 +99,15 @@ SCEN = {
 
 def scenario():
     """Detecta el escenario en curso por el proceso de k6 (el dashboard no depende de run-scenario.sh)."""
+    try:  # marcador escrito por run-scenario.sh (el generador puede estar dentro del clúster)
+        m = json.load(open("results/raw/.current-scenario"))
+        for key, (title, desc) in SCEN.items():
+            if key.startswith(m["scenario"] + "-"):
+                secs = int(time.time() - m["start"])
+                extra = f"escalón actual ≈ {50 + 50 * min(11, secs // 60)} req/s" if m["scenario"] == "p0" else None
+                return {"title": title, "desc": desc, "elapsed": secs, "extra": extra}
+    except Exception:
+        pass
     try:
         out = subprocess.run(["ps", "-axo", "etime=,command="], capture_output=True, text=True, timeout=3).stdout
     except Exception:

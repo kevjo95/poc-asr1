@@ -127,7 +127,7 @@
 
   <section class="bottom">
     <div class="card"><h2>Detalle por réplica</h2>
-      <table><thead><tr><th>Pod</th><th>Nodo</th><th>Estado</th><th>CPU (request 100m · límite 500m)</th><th>req/s</th><th>p99</th><th>Edad</th></tr></thead><tbody id="pods"></tbody></table></div>
+      <table><thead><tr><th>Pod</th><th>Nodo</th><th>Estado</th><th>CPU (request 100m · límite 2000m)</th><th>req/s</th><th>p99</th><th>Edad</th></tr></thead><tbody id="pods"></tbody></table></div>
     <div class="card"><h2>Eventos</h2><div id="events"></div></div>
   </section>
 </main>
@@ -239,9 +239,9 @@ function draw() {
 
   // pods
   $('pods').innerHTML = (s.pods || []).map(p => {
-    const pct = Math.min(100, p.cpu / 500 * 100);
+    const pct = Math.min(100, p.cpu / 2000 * 100);
     return `<tr><td><b>${p.name}</b></td><td>${p.node}</td><td><span class="tag ${p.state}">${p.state}</span></td>
-      <td><div class="bar"><b style="width:${pct}%;background:${p.cpu > 400 ? 'var(--bad)' : p.cpu > 80 ? 'var(--warn)' : 'var(--blue)'}"></b><u style="left:20%"></u></div><small>${fmt(p.cpu, 0)}m</small></td>
+      <td><div class="bar"><b style="width:${pct}%;background:${p.cpu > 1600 ? 'var(--bad)' : p.cpu > 80 ? 'var(--warn)' : 'var(--blue)'}"></b><u style="left:5%"></u></div><small>${fmt(p.cpu, 0)}m</small></td>
       <td>${fmt(p.rps, 0)}</td><td>${p.p99 == null ? '–' : fmt(p.p99, 0) + ' ms'}</td><td>${p.age < 120 ? p.age + ' s' : Math.round(p.age / 60) + ' min'}</td></tr>`;
   }).join('');
   $('events').innerHTML = (DATA.events || []).map(e => `<div><time>${e.t}</time><span class="${e.level}">${e.msg}</span></div>`).join('');

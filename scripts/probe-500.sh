@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Prueba corta de saturación de UNA réplica a 500 req/s con el generador dentro del clúster.
 # Uso: ./scripts/probe-500.sh <etiqueta> [valores de helm...]   (p. ej. --set resources.limits.cpu=2000m)
-set -uo pipefail
+set +e
 cd "$(dirname "$0")/.."; source scripts/lib.sh
 export KUBECONFIG="${KUBECONFIG:-$HOME/.kube/poc-asr1.yaml}"
 LABEL="$1"; shift; RATE="${RATE:-500}"; DUR="${DUR:-40}"

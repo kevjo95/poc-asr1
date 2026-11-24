@@ -10,7 +10,7 @@
   </parent>
   <groupId>edu.poc.asr1</groupId>
   <artifactId>ingest-ms</artifactId>
-  <version>0.1.0</version>
+  <version>0.2.0</version>
   <name>ingest-ms</name>
   <description>MS de ingesta de webhooks (PoC ASR1, uso académico)</description>
 

@@ -1,9 +1,7 @@
 spring:
   application:
     name: ingest-ms
-  threads:
-    virtual:
-      enabled: true          # regla 5: virtual threads
+  # Hilos de plataforma (Tomcat, 200 por defecto): igual que el servicio de referencia, que no configura virtual threads (ADR 0008).
 server:
   shutdown: graceful
   tomcat:
