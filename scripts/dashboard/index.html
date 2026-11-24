@@ -75,7 +75,7 @@
 <header>
   <div>
     <h1>PoC ASR1 · Escalabilidad de la ingesta de webhooks</h1>
-    <div class="sub">kind + LocalStack · datos sintéticos · criterios: p99 &lt; 300 ms · errores &lt; 0,1 % · 0 perdidos</div>
+    <div class="sub"><span id="env-t">kind + LocalStack</span> · datos sintéticos · criterios: p99 &lt; 300 ms · errores &lt; 0,1 % · 0 perdidos</div>
   </div>
   <div class="grow"></div>
   <div class="seg" id="win"><button data-w="60">2 min</button><button data-w="150" class="on">5 min</button><button data-w="450">15 min</button></div>
@@ -218,6 +218,7 @@ function draw() {
   $('n-sqs').className = 'node ' + lvl(s.dlq > 0, false);
   $('f-lam').textContent = s.lambda === 'Enabled' ? 'Activa' : s.lambda === 'Disabled' ? 'En pausa' : s.lambda;
   $('n-lam').className = 'node ' + (s.lambda === 'Enabled' ? 'ok' : 'warn');
+  $('env-t').textContent = s.aws ? 'Amazon EKS + SQS + Lambda + DynamoDB (us-east-1)' : 'kind + LocalStack';
   $('f-items').textContent = s.items == null ? '–' : fmt(s.items);
   $('n-ddb').className = 'node ok';
 
