@@ -92,3 +92,9 @@ Restricciones nuevas y su efecto en el diseño (**reemplazan las decisiones 2 y 
 | Presupuesto ya existe | `create_budget = false` por defecto |
 
 `terraform plan` en modo cuota-5: **63 a crear, 0 a cambiar, 0 a destruir** (sin NAT ni IP elásticas). Pendiente: aprobación explícita para `apply` (A2).
+
+### Preparación de monitoreo y guion (23-nov)
+- Dashboard con `TARGET=aws`: nodos, pods `Pending`, «Creado → Ready» por pod y por nodo, contador de 202 aceptados (la cola ya no refleja el volumen porque la Lambda está activa).
+- `run-scenario.sh` con `TARGET=aws`: Lambda activa, destino NLB interno, conciliación nivel 1 con CloudWatch `NumberOfMessagesSent`. **Probado solo con `bash -n` y en local; su primera ejecución real es en AWS.**
+- Panel de CloudWatch creado por Terraform (`cloudwatch-dashboard.tf`): el plan pasa a **64 a crear**.
+- Guion de grabación y recorrido de la consola: `docs/guion-video-aws.md`.

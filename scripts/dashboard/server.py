@@ -19,6 +19,8 @@ HIST = collections.deque(maxlen=int(os.environ.get("HISTORY", 450)))      # ~15 
 EVENTS = collections.deque(maxlen=60)
 LOCK = threading.Lock()
 STATE = {"loaded": False}
+AWS_MODE = bool(os.environ.get("USE_AWS"))
+SENT = {"total": 0.0}   # 202 aceptados desde que arrancó el dashboard (suma de deltas de los contadores de los pods)
 
 if not os.environ.get("USE_AWS"):
     os.environ.setdefault("AWS_ACCESS_KEY_ID", "test"); os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "test")
@@ -147,7 +149,10 @@ def collect():
         row = {"name": name[-5:], "node": p["spec"].get("nodeName", "-").replace("poc-asr1-", ""),
                "state": "Terminating" if terminating else ("Ready" if ready else p["status"].get("phase", "?")),
                "age": int(now - datetime.fromisoformat(p["metadata"]["creationTimestamp"].replace("Z", "+00:00")).timestamp()),
-               "cpu": round(cpu.get(name, 0), 1), "rps": 0.0, "p99": None}
+               "cpu": round(cpu.get(name, 0), 1), "rps": 0.0, "p99": None, "ready_s": None}
+        if ready:
+            rt = next((c.get("lastTransitionTime") for c in p["status"].get("conditions", []) if c["type"] == "Ready"), None)
+            if rt: row["ready_s"] = int(datetime.fromisoformat(rt.replace("Z", "+00:00")).timestamp() - datetime.fromisoformat(p["metadata"]["creationTimestamp"].replace("Z", "+00:00")).timestamp())
         if ready and not terminating:
             prom = parse_prom(kraw(f"/api/v1/namespaces/{NS}/pods/{name}:8080/proxy/actuator/prometheus"))
             cur_pod[name] = prom
@@ -159,13 +164,25 @@ def collect():
                 db = {k: max(0.0, v - prev["w_b"].get(k, 0.0)) for k, v in prom["w_b"].items()}
                 dsb = {k: max(0.0, v - prev["s_b"].get(k, 0.0)) for k, v in prom["s_b"].items()}
                 row["p99"] = None if row["rps"] == 0 else (round(pctl(db), 1) if pctl(db) is not None else None)
-                agg_cnt_ok += d_ok; agg_cnt_err += d_er
+                agg_cnt_ok += d_ok; agg_cnt_err += d_er; SENT["total"] += d_ok
                 for k, v in db.items(): agg_b[k] += v
                 for k, v in dsb.items(): agg_sb[k] += v
         pods.append(row)
     PREV_POD, PREV_T = cur_pod, now
     pods.sort(key=lambda r: (r["state"] != "Ready", -r["age"]))
 
+    nodes_j = json.loads(kraw("/api/v1/nodes") or '{"items":[]}')
+    nodes = []
+    for n in nodes_j.get("items", []):
+        conds = {c["type"]: c for c in n["status"].get("conditions", [])}
+        nready = conds.get("Ready", {}).get("status") == "True"
+        t0 = datetime.fromisoformat(n["metadata"]["creationTimestamp"].replace("Z", "+00:00")).timestamp()
+        tr = conds.get("Ready", {}).get("lastTransitionTime")
+        nodes.append({"name": n["metadata"]["name"].replace(".ec2.internal", "").replace(".compute.internal", "").replace("poc-asr1-", "")[-22:],
+                      "role": n["metadata"].get("labels", {}).get("role", "control" if "control-plane" in str(n["metadata"].get("labels", {})) else "-"),
+                      "type": n["metadata"].get("labels", {}).get("node.kubernetes.io/instance-type", "-"), "ready": nready, "age": int(now - t0),
+                      "ready_s": int(datetime.fromisoformat(tr.replace("Z", "+00:00")).timestamp() - t0) if (tr and nready) else None})
+    pending = sum(1 for r in pods if r["state"] == "Pending")
     total = agg_cnt_ok + agg_cnt_err
     rps = round(total / dt, 1) if dt else 0.0
     p99 = pctl(agg_b) if total > 0 else None
@@ -183,7 +200,7 @@ def collect():
         return int(a["ApproximateNumberOfMessages"]), int(a["ApproximateNumberOfMessagesNotVisible"])
     q = sqs.get_queue_url(QueueName=f"{PREFIX}-ingest")["QueueUrl"]; dq = sqs.get_queue_url(QueueName=f"{PREFIX}-ingest-dlq")["QueueUrl"]
     qv, qf = qa(q); dv, df = qa(dq)
-    try: items = ddb.describe_table(TableName=f"{PREFIX}-idempotency")["Table"]["ItemCount"]
+    try: items = None if AWS_MODE else ddb.describe_table(TableName=f"{PREFIX}-idempotency")["Table"]["ItemCount"]  # en DynamoDB real se actualiza cada ~6 h
     except Exception: items = None
     try: lstate = lam.list_event_source_mappings(FunctionName=f"{PREFIX}-reconciler")["EventSourceMappings"][0]["State"]
     except Exception: lstate = "?"
@@ -199,15 +216,21 @@ def collect():
         if LAST["pods"]: add(f"Pod nuevo {n} creado", "info")
     if dv + df > 0 and not LAST["dlq"]: add(f"DLQ con {dv + df} mensajes", "bad")
     if lstate != LAST["lambda"] and LAST["lambda"] is not None: add(f"Lambda de conciliación: {lstate}", "info")
+    if LAST.get("nodes") is not None and len(nodes) != LAST["nodes"]:
+        add(f"Nodos del clúster: {LAST['nodes']} → {len(nodes)}", "scale")
+    if LAST.get("pending") is not None and pending > LAST["pending"]:
+        add(f"{pending} pod(s) en Pending (esperan capacidad)", "bad")
+    LAST["nodes"], LAST["pending"] = len(nodes), pending
     LAST.update(desired=hpa["desired"], ready=ready_n, dlq=dv + df, pods=cur_names); LAST["lambda"] = lstate
 
     snap = {"t": int(now), "rps": rps, "p99": None if p99 is None else round(p99, 1), "sqs_p99": None if sq99 is None else round(sq99, 1),
             "err": round(err * 100, 3), "ready": ready_n, "hpa": hpa, "queue": qv + qf, "queue_visible": qv, "queue_inflight": qf,
-            "dlq": dv + df, "items": items, "lambda": lstate, "pods": pods,
+            "dlq": dv + df, "items": items, "aws": AWS_MODE, "sent_total": int(SENT["total"]),
+            "nodes": nodes, "pending": pending, "lambda": lstate, "pods": pods,
             "scenario": scenario(), "limits": {"p99_ms": P99_LIMIT_MS, "err_pct": ERR_LIMIT * 100, "hpa_target": HPA_TARGET}}
     with LOCK:
         STATE.update(snap); STATE["loaded"] = True
-        HIST.append({k: snap[k] for k in ("t", "rps", "p99", "sqs_p99", "err", "ready", "queue", "dlq")} | {"desired": hpa["desired"], "cpu_pct": hpa["cpu_pct"]})
+        HIST.append({k: snap[k] for k in ("t", "rps", "p99", "sqs_p99", "err", "ready", "queue", "dlq")} | {"nodes": len(nodes), "pending": pending, "desired": hpa["desired"], "cpu_pct": hpa["cpu_pct"]})
 
 
 def loop():

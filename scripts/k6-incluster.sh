@@ -3,6 +3,7 @@
 # Uso:  k6-incluster.sh up | down | run <archivo.js> <RUN_ID> [VAR=valor ...]
 set -euo pipefail
 cd "$(dirname "$0")/.."
+[ "${K6_TARGET:-kind}" = "aws" ] && export KUBECONFIG="${KUBECONFIG_AWS:-$HOME/.kube/poc-asr1-aws.yaml}"
 export KUBECONFIG="${KUBECONFIG:-$HOME/.kube/poc-asr1.yaml}"
 IMG="grafana/k6:${K6_IMAGE_TAG:-1.4.0}"; POD=k6-runner
 case "${1:?up|down|run}" in
@@ -24,7 +25,7 @@ case "${1:?up|down|run}" in
     FILE="$2"; RUN="$3"; shift 3
     kubectl exec $POD -- sh -c 'rm -rf /tmp/w && mkdir -p /tmp/w/results/summaries'
     kubectl cp load $POD:/tmp/w/load >/dev/null
-    ENVS=(-e "RUN_ID=$RUN" -e "BASE_URL=${BASE_URL:-http://ingest-ms:8080}"); for kv in "$@"; do ENVS+=(-e "$kv"); done
+    ENVS=(-e "RUN_ID=$RUN" -e "BASE_URL=${BASE_URL:-http://ingest-ms:8080}"); [ -n "${INGEST_HMAC_SECRET:-}" ] && ENVS+=(-e "HMAC_SECRET=$INGEST_HMAC_SECRET"); for kv in "$@"; do ENVS+=(-e "$kv"); done
     set +e; kubectl exec $POD -- sh -c "cd /tmp/w && k6 run ${ENVS[*]} $FILE"; RC=$?; set -e
     kubectl cp $POD:/tmp/w/results/summaries/$RUN.json "results/summaries/$RUN.json" >/dev/null 2>&1 || echo "AVISO: no se encontró el resumen de k6"
     exit $RC ;;

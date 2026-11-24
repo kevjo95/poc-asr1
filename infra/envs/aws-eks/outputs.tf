@@ -8,3 +8,4 @@ output "table_name" { value = module.stack.table_name }
 output "function_name" { value = module.stack.function_name }
 output "ingest_role_arn" { value = module.ingest_irsa.iam_role_arn }
 output "autoscaler_role_arn" { value = module.autoscaler_irsa.iam_role_arn }
+output "cloudwatch_dashboard" { value = aws_cloudwatch_dashboard.poc.dashboard_name }

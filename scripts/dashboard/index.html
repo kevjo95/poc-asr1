@@ -127,7 +127,10 @@
 
   <section class="bottom">
     <div class="card"><h2>Detalle por réplica</h2>
-      <table><thead><tr><th>Pod</th><th>Nodo</th><th>Estado</th><th>CPU (request 100m · límite 2000m)</th><th>req/s</th><th>p99</th><th>Edad</th></tr></thead><tbody id="pods"></tbody></table></div>
+      <table><thead><tr><th>Pod</th><th>Nodo</th><th>Estado</th><th>CPU (request 200m · límite 2000m)</th><th>req/s</th><th>p99</th><th>Edad</th><th>Listo en</th></tr></thead><tbody id="pods"></tbody></table></div>
+    <div class="card"><h2>Nodos del clúster</h2>
+      <table><thead><tr><th>Nodo</th><th>Rol</th><th>Tipo</th><th>Estado</th><th>Edad</th><th>Creado → Ready</th></tr></thead><tbody id="nodes"></tbody></table>
+      <div class="sub" id="nodes-s" style="margin-top:6px"></div></div>
     <div class="card"><h2>Eventos</h2><div id="events"></div></div>
   </section>
 </main>
@@ -210,12 +213,12 @@ function draw() {
   $('f-pods').textContent = `${s.ready}${hpa.desired != null ? ' / ' + hpa.desired : ''}`;
   $('f-ms-s').textContent = `réplicas listas${hpa.enabled ? ' / deseadas' : ' (HPA apagado)'} · p99 ${fmt(s.p99, 0)} ms`;
   $('n-ms').className = 'node ' + lvl(p99Lvl === 'bad' || errLvl === 'bad', p99Lvl === 'warn' || scaling);
-  $('f-q').textContent = fmt(s.queue);
-  $('f-q-s').textContent = `persistidos (${fmt(s.queue_inflight)} en vuelo) · DLQ ${fmt(s.dlq)}`;
+  $('f-q').textContent = s.aws ? fmt(s.sent_total) : fmt(s.queue);
+  $('f-q-s').textContent = s.aws ? `202 aceptados en total · DLQ ${fmt(s.dlq)}` : `persistidos (${fmt(s.queue_inflight)} en vuelo) · DLQ ${fmt(s.dlq)}`;
   $('n-sqs').className = 'node ' + lvl(s.dlq > 0, false);
   $('f-lam').textContent = s.lambda === 'Enabled' ? 'Activa' : s.lambda === 'Disabled' ? 'En pausa' : s.lambda;
   $('n-lam').className = 'node ' + (s.lambda === 'Enabled' ? 'ok' : 'warn');
-  $('f-items').textContent = fmt(s.items);
+  $('f-items').textContent = s.items == null ? '–' : fmt(s.items);
   $('n-ddb').className = 'node ok';
 
   // KPIs
@@ -225,7 +228,9 @@ function draw() {
   kpi('err', 'Errores', fmt(s.err, 3) + ' %', 'criterio: < 0,1 %', errLvl);
   kpi('rep', 'Réplicas listas', `${s.ready}${hpa.desired != null ? ' / ' + hpa.desired : ''}`, hpa.enabled ? `HPA mín ${hpa.min} · máx ${hpa.max}` : 'HPA apagado (réplica fija)', scaling ? 'warn' : 'ok');
   kpi('cpu', 'CPU promedio (HPA)', hpa.cpu_pct == null ? '–' : hpa.cpu_pct + ' %', `escala al superar ${lim.hpa_target} % del request`, cpuLvl);
-  kpi('queue', 'Cola de ingesta', fmt(s.queue), 'mensajes persistidos', 'ok');
+  kpi('queue', s.aws ? 'Aceptados (202)' : 'Cola de ingesta', s.aws ? fmt(s.sent_total) : fmt(s.queue), s.aws ? 'desde que arrancó el dashboard' : 'mensajes persistidos', 'ok');
+  const nn = s.nodes || [];
+  kpi('nodes', 'Nodos', `${nn.filter(n => n.ready).length}${nn.some(n => !n.ready) ? ' + ' + nn.filter(n => !n.ready).length + ' no listos' : ''}`, `${s.pending || 0} pod(s) en Pending`, (s.pending || 0) > 0 ? 'warn' : 'ok');
   kpi('dlq', 'DLQ', fmt(s.dlq), 'debe permanecer en 0', dlqLvl);
 
   // gráficas
@@ -242,8 +247,10 @@ function draw() {
     const pct = Math.min(100, p.cpu / 2000 * 100);
     return `<tr><td><b>${p.name}</b></td><td>${p.node}</td><td><span class="tag ${p.state}">${p.state}</span></td>
       <td><div class="bar"><b style="width:${pct}%;background:${p.cpu > 1600 ? 'var(--bad)' : p.cpu > 80 ? 'var(--warn)' : 'var(--blue)'}"></b><u style="left:5%"></u></div><small>${fmt(p.cpu, 0)}m</small></td>
-      <td>${fmt(p.rps, 0)}</td><td>${p.p99 == null ? '–' : fmt(p.p99, 0) + ' ms'}</td><td>${p.age < 120 ? p.age + ' s' : Math.round(p.age / 60) + ' min'}</td></tr>`;
+      <td>${fmt(p.rps, 0)}</td><td>${p.p99 == null ? '–' : fmt(p.p99, 0) + ' ms'}</td><td>${p.age < 120 ? p.age + ' s' : Math.round(p.age / 60) + ' min'}</td><td>${p.ready_s == null ? '–' : p.ready_s + ' s'}</td></tr>`;
   }).join('');
+  $('nodes').innerHTML = (s.nodes || []).map(n => `<tr><td><b>${n.name}</b></td><td>${n.role}</td><td>${n.type}</td><td><span class="tag ${n.ready ? 'Ready' : 'Pending'}">${n.ready ? 'Ready' : 'NotReady'}</span></td>
+      <td>${n.age < 120 ? n.age + ' s' : Math.round(n.age / 60) + ' min'}</td><td>${n.ready_s == null ? '–' : n.ready_s + ' s'}</td></tr>`).join('');
   $('events').innerHTML = (DATA.events || []).map(e => `<div><time>${e.t}</time><span class="${e.level}">${e.msg}</span></div>`).join('');
 }
 
