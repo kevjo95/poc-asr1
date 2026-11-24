@@ -19,9 +19,9 @@ TAG="$(awk '/^  tag:/{gsub(/"/,"",$2); print $2; exit}' deploy/helm/ingest-ms/va
 echo "[1/6] kubeconfig";  aws eks update-kubeconfig --name "$CLUSTER" --region "$REGION" --kubeconfig "$KUBECONFIG" >/dev/null
 kubectl wait --for=condition=Ready nodes --all --timeout=300s >/dev/null
 
-echo "[2/6] Imagen arm64 -> ECR (los nodos son Graviton)"
+echo "[2/6] Imagen amd64 -> ECR (nodos x86_64 m7i-flex)"
 aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "${ECR%%/*}" >/dev/null
-docker build -q --platform linux/arm64 -t "$ECR:$TAG" services/ingest-ms >/dev/null
+docker build -q --platform linux/amd64 -t "$ECR:$TAG" services/ingest-ms >/dev/null
 docker push -q "$ECR:$TAG" >/dev/null
 
 echo "[3/6] metrics-server"
@@ -39,7 +39,8 @@ helm upgrade --install cluster-autoscaler autoscaler/cluster-autoscaler -n kube-
 
 echo "[5/6] MS de ingesta"
 SECRET="${INGEST_HMAC_SECRET:-$(openssl rand -hex 16)}"
-helm upgrade --install ingest-ms deploy/helm/ingest-ms -f deploy/helm/ingest-ms/values-aws.yaml \
+LITE=(); [ "${AWS_LITE:-0}" = "1" ] && LITE=(-f deploy/helm/ingest-ms/values-aws-lite.yaml)   # AWS_LITE=1 con cuota de 5 vCPU
+helm upgrade --install ingest-ms deploy/helm/ingest-ms -f deploy/helm/ingest-ms/values-aws.yaml ${LITE[@]+"${LITE[@]}"} \
   --set image.repository="$ECR" --set image.tag="$TAG" --set config.queueUrl="$QUEUE_URL" --set config.region="$REGION" \
   --set "serviceAccount.annotations.eks\.amazonaws\.com/role-arn=$INGEST_ROLE" --set hmacSecret="$SECRET" >/dev/null
 kubectl rollout status deploy/ingest-ms --timeout=600s

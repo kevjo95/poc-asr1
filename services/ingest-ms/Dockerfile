@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1
-FROM maven:3.9-eclipse-temurin-25 AS build
+# Maven corre en la arquitectura del equipo (el .jar no depende de ella); solo el JRE final toma la arquitectura destino.
+FROM --platform=$BUILDPLATFORM maven:3.9-eclipse-temurin-25 AS build
 WORKDIR /src
 COPY pom.xml .
 RUN mvn -q -B dependency:go-offline

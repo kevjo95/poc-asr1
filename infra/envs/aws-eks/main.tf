@@ -7,6 +7,30 @@ data "aws_availability_zones" "available" {
 
 locals {
   azs = slice(data.aws_availability_zones.available.names, 0, 2)
+
+  ms_group = {
+    ami_type       = var.ami_type
+    instance_types = [var.ms_instance_type]
+    min_size       = var.ms_min_nodes
+    max_size       = var.ms_max_nodes
+    desired_size   = var.ms_min_nodes
+    labels         = { role = "ms" }
+    tags = { # descubrimiento del Cluster Autoscaler
+      "k8s.io/cluster-autoscaler/enabled"     = "true"
+      "k8s.io/cluster-autoscaler/${var.name}" = "owned"
+    }
+  }
+  load_group = {
+    ami_type       = var.ami_type
+    instance_types = [var.load_instance_type]
+    min_size       = 1
+    max_size       = 1
+    desired_size   = 1
+    labels         = { role = "load" }
+    taints = {
+      load = { key = "load", value = "true", effect = "NO_SCHEDULE" }
+    }
+  }
 }
 
 # --- Red: solo subredes públicas (sin NAT Gateway: ahorra ~US$32/mes y es irrelevante para una sesión corta) ---
@@ -51,31 +75,7 @@ module "eks" {
     vpc-cni    = { most_recent = true }
   }
 
-  eks_managed_node_groups = {
-    ms = {
-      ami_type       = "AL2023_ARM_64_STANDARD"
-      instance_types = [var.ms_instance_type]
-      min_size       = var.ms_min_nodes
-      max_size       = var.ms_max_nodes
-      desired_size   = var.ms_min_nodes
-      labels         = { role = "ms" }
-      tags = { # descubrimiento del Cluster Autoscaler
-        "k8s.io/cluster-autoscaler/enabled"     = "true"
-        "k8s.io/cluster-autoscaler/${var.name}" = "owned"
-      }
-    }
-    load = {
-      ami_type       = "AL2023_ARM_64_STANDARD"
-      instance_types = [var.load_instance_type]
-      min_size       = 1
-      max_size       = 1
-      desired_size   = 1
-      labels         = { role = "load" }
-      taints = {
-        load = { key = "load", value = "true", effect = "NO_SCHEDULE" }
-      }
-    }
-  }
+  eks_managed_node_groups = merge({ ms = local.ms_group }, var.load_enabled ? { load = local.load_group } : {})
 }
 
 # --- Registro de imágenes ---
@@ -129,6 +129,7 @@ module "autoscaler_irsa" {
 
 # --- Guardrail de costo ---
 resource "aws_budgets_budget" "poc" {
+  count        = var.create_budget ? 1 : 0
   name         = "${var.name}-monthly"
   budget_type  = "COST"
   limit_amount = tostring(var.budget_usd)

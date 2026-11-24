@@ -10,7 +10,7 @@ case "${1:?up|down|run}" in
     if [ "${K6_TARGET:-kind}" = "aws" ]; then
       # En EKS el pod va al grupo de nodos de carga (con taint) y descarga la imagen pública (multi-arquitectura).
       kubectl get pod $POD >/dev/null 2>&1 || kubectl run $POD --image="$IMG" --restart=Never --labels=app=k6-runner \
-        --overrides='{"spec":{"nodeSelector":{"role":"load"},"tolerations":[{"key":"load","operator":"Equal","value":"true","effect":"NoSchedule"}]}}' \
+        --overrides='{"spec":{"nodeSelector":{"role":"'"${K6_NODE_ROLE:-load}"'"},"tolerations":[{"key":"load","operator":"Equal","value":"true","effect":"NoSchedule"}]}}' \
         --command -- sleep infinity >/dev/null
     else
       docker image inspect "$IMG" >/dev/null 2>&1 || docker pull -q "$IMG" >/dev/null

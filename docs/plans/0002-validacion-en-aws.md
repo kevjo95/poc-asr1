@@ -79,3 +79,16 @@ Hecho y validado localmente (`terraform validate`, `terraform fmt`, `helm lint` 
 
 **Pendiente para A5 (carga en AWS):** adaptar `run-scenario.sh` para AWS (conciliación contra `NumberOfMessagesSent` de CloudWatch, Lambda activa, sin `kind`), y el dashboard para leer SQS real.
 **Riesgos conocidos a verificar con la cuenta:** que la imagen del Cluster Autoscaler coincida con la versión de Kubernetes (`CA_IMAGE_TAG`), que 2 pods de 3096 MiB quepan por nodo `m7g.large` (memoria asignable), y la cuota de vCPU.
+
+## Actualización 23-nov (perfil listo, verificado en solo lectura)
+Cuenta en **plan gratuito con créditos (120 USD, vencen 23-may-2027)**; acceso con `aws login` (usuario IAM + MFA, sin llaves). Verificado: identidad correcta, presupuesto mensual de 20 USD con alertas, EKS 1.36 en soporte estándar hasta ago-2027.
+Restricciones nuevas y su efecto en el diseño (**reemplazan las decisiones 2 y 4 de arriba**):
+| Restricción | Efecto |
+|---|---|
+| Tipos permitidos: `m7i-flex.large` (MS) y `c7i-flex.large` (carga), ambos x86_64 | Se abandona Graviton; imagen `linux/amd64`; el Dockerfile compila con Maven en la arquitectura del equipo |
+| Cuota de vCPU = 5 (aumento a 32 pendiente) | Modo **cuota-5**: 2 nodos del MS, sin nodo de carga (k6 en los nodos del MS), perfil `values-aws-lite.yaml` (1 GiB por pod). No mide nodo nuevo |
+| Modo completo (cuota ≥ 32) | `ms_max_nodes` hasta 9, `load_enabled = true`, perfil de producción de 3096 MiB |
+| No usar Organizations ni Identity Center | Perfil puente `poc-asr1-tf` (`credential_process`) para que Terraform use la sesión de `aws login` |
+| Presupuesto ya existe | `create_budget = false` por defecto |
+
+`terraform plan` en modo cuota-5: **63 a crear, 0 a cambiar, 0 a destruir** (sin NAT ni IP elásticas). Pendiente: aprobación explícita para `apply` (A2).

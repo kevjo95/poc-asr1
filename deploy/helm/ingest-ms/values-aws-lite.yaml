@@ -1,0 +1,7 @@
+# Perfil "lite" para la cuota de 5 vCPU (2 nodos de 8 GiB): se combina DESPUÉS de values-aws.yaml.
+# Mismo CPU que producción (request 200m / límite 2000m), pero memoria reducida para que quepan hasta 8 réplicas en 2 nodos.
+# Sirve para validar el HPA y los pods en AWS; la capacidad absoluta y el nodo nuevo requieren el perfil completo.
+resources:
+  requests: { cpu: 200m, memory: 1Gi }
+  limits:   { cpu: 2000m, memory: 1Gi }
+javaOpts: "-Xss256k -Xmx512m -Xms512m -XX:+UseG1GC"

@@ -1,4 +1,13 @@
-# Copia a terraform.tfvars (ignorado por Git) y completa. No subas valores reales al repositorio.
+# Copia a terraform.tfvars (ignorado por Git). Elige UN preset y no subas valores reales al repositorio.
 aws_profile     = "poc-asr1"
-budget_email    = "tu-correo-personal@example.com"
-cluster_version = "REEMPLAZAR"   # ver la descripción de la variable para elegir una versión en soporte estándar
+cluster_version = "1.36"
+
+# --- Preset cuota-5 (cuota actual de 5 vCPU: 2 nodos de 2 vCPU = 4). k6 corre en los nodos del MS; no se puede medir nodo nuevo.
+ms_min_nodes = 2
+ms_max_nodes = 2
+load_enabled = false
+
+# --- Preset completo (cuota >= 32): descomenta y comenta el anterior. Con ms_max_nodes = 9 se llega a ~20 vCPU.
+# ms_min_nodes = 2
+# ms_max_nodes = 9
+# load_enabled = true
