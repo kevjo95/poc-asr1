@@ -1,0 +1,3 @@
+Nivel 1 · 202 contados por k6 = 243662 · mensajes persistidos en SQS (CloudWatch NumberOfMessagesSent) = 243662 · diferencia = 0
+Nivel 2 · procesado por la Lambda: COMPLETADO=243662, EN_PROCESO=0, DLQ=0, pendientes en cola=0
+         cola drenada por completo: COMPLETADO - 202 = 0

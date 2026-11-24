@@ -13,8 +13,8 @@ queue_url() { "${AWS[@]}" sqs get-queue-url --queue-name "$1" --query QueueUrl -
 q_attr()    { "${AWS[@]}" sqs get-queue-attributes --queue-url "$1" --attribute-names "$2" --query "Attributes.$2" --output text; }
 count_status() { "${AWS[@]}" dynamodb scan --table-name "$TABLE_NAME" --select COUNT \
   --filter-expression "#s = :s" --expression-attribute-names '{"#s":"status"}' \
-  --expression-attribute-values "{\":s\":{\"S\":\"$1\"}}" --query Count --output text; }
-count_all() { "${AWS[@]}" dynamodb scan --table-name "$TABLE_NAME" --select COUNT --query Count --output text; }
+  --expression-attribute-values "{\":s\":{\"S\":\"$1\"}}" --output json | python3 -c "import sys,json;print(json.load(sys.stdin)['Count'])"; }   # en JSON el CLI suma las páginas (en text imprime una cifra por página)
+count_all() { "${AWS[@]}" dynamodb scan --table-name "$TABLE_NAME" --select COUNT --output json | python3 -c "import sys,json;print(json.load(sys.stdin).get('Count',0))"; }
 purge_all() {
   for q in "$QUEUE_NAME" "$DLQ_NAME"; do "${AWS[@]}" sqs purge-queue --queue-url "$(queue_url "$q")" >/dev/null 2>&1 || true; done
   for id in $("${AWS[@]}" dynamodb scan --table-name "$TABLE_NAME" --projection-expression eventId --query 'Items[].eventId.S' --output text); do

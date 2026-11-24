@@ -124,5 +124,8 @@ if cpu:
 
 w("\n## Conciliación de pérdidas\n")
 w("```\n" + open(f"{run_dir}/reconcile.txt").read().strip() + "\n```")
-w("\n> Entorno local con recursos reducidos en proporción (ADR 0006): p99 y tiempo de escalado son indicativos, no comparables con producción.")
+if os.environ.get("TARGET") == "aws":
+    w("\n> Amazon EKS con SQS, Lambda y DynamoDB reales (plan 0002): el MS usa el perfil de producción; resultados comparables con producción.")
+else:
+    w("\n> Entorno local con recursos reducidos en proporción (ADR 0006): p99 y tiempo de escalado son indicativos, no comparables con producción.")
 print("\n".join(out))
