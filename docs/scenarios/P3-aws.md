@@ -27,4 +27,6 @@ Pods nuevos, de creación a *Ready*: mín 9 s, promedio 51 s, **máx 67 s** (inc
 interno de < 60 s por pod. CPU máxima del HPA 137 % del request; con 8 réplicas, 54–97 %. CPU máxima de un pod: 1 051 m.
 
 ## Conciliación
-Nivel 1: 597 989 `202` = 597 989 mensajes en SQS (CloudWatch), diferencia 0. Nivel 2 parcial al terminar el script (la Lambda drena a ~200–300 msg/s): DLQ 0; el vaciado completo se verifica después por separado.
+Nivel 1: 597 989 `202` = 597 989 mensajes en SQS (CloudWatch), diferencia 0. Nivel 2 parcial al terminar el script (la Lambda drena a ~200–300 msg/s): DLQ 0; se destruyó el entorno antes del vaciado completo.
+Última lectura (01:58, ~24 min tras terminar la carga): `COMPLETADO` = 548 460, `EN_PROCESO` = 4, DLQ = 0, ~58 000 mensajes aún en cola (la Lambda drenaba a ~250 msg/s). **El nivel 2 de P3 queda sin cerrar al 100 %**:
+no se observó ninguna pérdida ni mensaje en la DLQ, pero la igualdad `COMPLETADO` = 597 989 no se comprobó. El nivel 1 (SQS) sí se cerró con diferencia 0, y el nivel 2 de P2 se cerró completo.
