@@ -19,9 +19,9 @@ terraform -chdir="$TF" destroy
 
 echo "[3/3] Verificación de residuos (todo debe salir vacío o en 0)"
 REGION="$(terraform -chdir="$TF" output -raw region 2>/dev/null || echo us-east-1)"
-echo "- instancias EC2 activas con la etiqueta del proyecto:"
-aws ec2 describe-instances --region "$REGION" --filters Name=tag:project,Values=poc-asr1 Name=instance-state-name,Values=pending,running,stopping,stopped \
-  --query 'Reservations[].Instances[].InstanceId' --output text
+echo "- instancias EC2 activas (TODAS; los nodos de EKS no llevan la etiqueta project, solo eks:cluster-name):"
+aws ec2 describe-instances --region "$REGION" --filters Name=instance-state-name,Values=pending,running,stopping,stopped \
+  --query 'Reservations[].Instances[].[InstanceId,InstanceType,State.Name]' --output text
 echo "- balanceadores:"; aws elbv2 describe-load-balancers --region "$REGION" --query 'LoadBalancers[].LoadBalancerName' --output text 2>/dev/null || true
 echo "- volúmenes EBS sin usar:"; aws ec2 describe-volumes --region "$REGION" --filters Name=status,Values=available --query 'Volumes[].VolumeId' --output text
 echo "- IP elásticas:"; aws ec2 describe-addresses --region "$REGION" --query 'Addresses[].PublicIp' --output text

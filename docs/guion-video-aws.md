@@ -13,23 +13,23 @@ Todo `apply` y el `destroy` final requieren confirmación explícita. Nada de lo
 - [ ] Pestañas de la consola abiertas de antemano (sección 2), el panel de CloudWatch ya favorito.
 
 ## 1 · Línea de tiempo de la sesión (≈ 2,5–3 h; ≈ 1–2 USD con todo encendido, confirmar en Cost Explorer)
-| Min | Qué pasa | Se graba |
-|---|---|---|
-| 0 | `terraform apply` (tras tu OK) | Sí, 1 min: el plan «64 a crear» y la confirmación. El resto se acelera |
-| 0–15 | Se crea el EKS y sus nodos | Consola: EKS → estado `Creating` → `Active`; EC2 → instancias apareciendo |
-| 15–25 | `./scripts/aws-up.sh`: imagen a ECR, metrics-server, Autoscaler, MS | Corto. Consola: ECR con la imagen, EKS → Workloads |
-| 25 | Prueba funcional: un `curl` firmado devuelve 202 y el mensaje aparece en SQS | Sí: consola SQS → *Send and receive messages* → *Poll* |
-| 30 | `TARGET=aws ./scripts/dashboard.sh` en otra terminal | Sí, es la pantalla principal |
-| 35–70 | `TARGET=aws ./scripts/run-scenario.sh p0` (capacidad por réplica) | Resumen |
-| 75–110 | `TARGET=aws ./scripts/run-scenario.sh p2` (la ráfaga del ASR1) | **Escena central** |
-| 115 | Informe + conciliación + CloudWatch | Sí |
-| 125 | `./scripts/aws-down.sh` (con tu OK) y verificación | Sí: consola vacía y Cost Explorer |
+| Min    | Qué pasa                                                                     | Se graba                                                                  |
+| ------ | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| 0      | `terraform apply` (tras tu OK)                                               | Sí, 1 min: el plan «64 a crear» y la confirmación. El resto se acelera    |
+| 0–15   | Se crea el EKS y sus nodos                                                   | Consola: EKS → estado `Creating` → `Active`; EC2 → instancias apareciendo |
+| 15–25  | `./scripts/aws-up.sh`: imagen a ECR, metrics-server, Autoscaler, MS          | Corto. Consola: ECR con la imagen, EKS → Workloads                        |
+| 25     | Prueba funcional: un `curl` firmado devuelve 202 y el mensaje aparece en SQS | Sí: consola SQS → *Send and receive messages* → *Poll*                    |
+| 30     | `TARGET=aws ./scripts/dashboard.sh` en otra terminal                         | Sí, es la pantalla principal                                              |
+| 35–70  | `TARGET=aws ./scripts/run-scenario.sh p0` (capacidad por réplica)            | Resumen                                                                   |
+| 75–110 | `TARGET=aws ./scripts/run-scenario.sh p2` (la ráfaga del ASR1)               | **Escena central**                                                        |
+| 115    | Informe + conciliación + CloudWatch                                          | Sí                                                                        |
+| 125    | `./scripts/aws-down.sh` (con tu OK) y verificación                           | Sí: consola vacía y Cost Explorer                                         |
 
 ## 2 · Qué mostrar en la consola de AWS (y para qué)
 | Servicio (buscar en la barra) | Dónde mirar | Qué demuestra |
 |---|---|---|
 | **EKS** | Clusters → `poc-asr1` → *Resources* (Workloads, Pods) y *Compute* (nodegroups) | La infraestructura montada: grupos de nodos, versión 1.36, add-ons |
-| **EC2 → Instances** | Filtro de etiqueta `project = poc-asr1` | Los nodos reales (`m7i-flex.large`); en modo completo, **aparecer un nodo nuevo en la ráfaga** |
+| **EC2 → Instances** | Filtro de etiqueta `eks:cluster-name = poc-asr1` (los nodos no llevan `project`) | Los nodos reales (`m7i-flex.large`); en modo completo, **aparecer un nodo nuevo en la ráfaga** |
 | **EC2 → Auto Scaling groups** | grupo del nodegroup `ms` → pestaña *Activity* | Historial «Launching a new EC2 instance» con hora: es la medición del tiempo de nodo nuevo |
 | **EC2 → Load Balancers** | NLB → *Listeners* y *Target health* | Camino real del tráfico; targets sanos |
 | **ECR** | Repositorios → `poc-asr1/ingest-ms` | La imagen publicada y su tag |
